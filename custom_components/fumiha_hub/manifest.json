@@ -12,7 +12,7 @@
   "documentation": "https://github.com/SagisawaTsubasa/FumihaHub",
   "integration_type": "hub",
   "iot_class": "calculated",
+  "issue_tracker": "https://github.com/SagisawaTsubasa/FumihaHub/issues",
   "requirements": [],
-  "version": "0.1.0",
-  "issue_tracker": "https://github.com/SagisawaTsubasa/FumihaHub/issues"
+  "version": "0.1.0"
 }
