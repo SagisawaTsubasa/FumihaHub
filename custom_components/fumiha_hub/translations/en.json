@@ -1,0 +1,14 @@
+{
+  "title": "Fumiha Hub",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Fumiha Hub",
+        "description": "Enable the shared sidebar shell: all Fumiha integrations that ship a panel converge into this single entry."
+      }
+    },
+    "abort": {
+      "already_configured": "Already configured"
+    }
+  }
+}

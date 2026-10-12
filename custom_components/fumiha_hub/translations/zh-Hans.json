@@ -1,0 +1,14 @@
+{
+  "title": "Fumiha Hub",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Fumiha Hub 文羽面板",
+        "description": "启用共享侧边栏壳：所有带面板的 Fumiha 集成将在这里汇聚为一个入口。"
+      }
+    },
+    "abort": {
+      "already_configured": "已配置"
+    }
+  }
+}

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<!-- =========================================================================
+  Fumiha Hub shell mockup — 观感验证用，非生产件（Codex mockup 纪律）。
+
+  目的：在不起 HA 的情况下检查壳的顶栏/页签/内容区观感与 tokens.css 组件层。
+  数据是写死的假页签与假卡片；生产观感即此观感（结构与 class 与壳一致）。
+  双击即可在浏览器打开（相对链接引用真 tokens.css，file:// 下可用）。
+========================================================================== -->
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>文羽面板 · mockup</title>
+<link rel="stylesheet" href="../custom_components/fumiha_hub/static/tokens.css">
+<style>
+  /* mockup 页自身只补三件壳外的东西：满高容器、dialog 基础样式、滚动条 */
+  html, body { margin: 0; height: 100%; }
+  .fx-dialog { border: 1px solid var(--fx-edge); border-radius: 10px; padding: 16px 18px; background: var(--fx-panel); color: var(--fx-txt); min-width: 280px; max-width: 90vw; }
+  .fx-dialog::backdrop { background: rgba(0,0,0,.35); }
+</style>
+</head>
+<body>
+<div class="fx-shell">
+  <!-- 顶栏：标题 + 灯组（ok 态） + 新鲜度 + 目录版本 -->
+  <header class="fx-topbar">
+    <h1>文羽面板</h1>
+    <div class="fx-meta">
+      <span class="fx-lamp ok" title="目录正常"></span>
+      <span>2s前</span>
+      <span>r7 · 2页</span>
+    </div>
+  </header>
+
+  <!-- 页签：provider 徽标（id 首段）+ 标题；第二项为选中态 -->
+  <nav class="fx-tabs" aria-label="页面">
+    <button class="fx-tab" role="tab" aria-selected="false">
+      <span class="fx-badge">luxbalance</span>亮度均衡
+    </button>
+    <button class="fx-tab" role="tab" aria-selected="true">
+      <span class="fx-badge">anl</span>夜灯助手
+    </button>
+    <button class="fx-tab" role="tab" aria-selected="false">
+      <span class="fx-badge">stockroom</span>仓管
+    </button>
+    <button class="fx-tab" role="tab" aria-selected="false">
+      <span class="fx-badge">sensorswitch</span>全屋状态扫描
+    </button>
+  </nav>
+
+  <!-- 内容区：假“夜灯助手”页，陈列 cx-* 组件供观感评审 -->
+  <div class="fx-content">
+    <div class="fx-body">
+      <div class="fx-card">
+        <h2>全局状态</h2>
+        <div class="cx-status">
+          <span class="cx-chip tone-ok"><span class="fx-lamp ok"></span>夜间 22:00–06:30</span>
+          <span class="cx-chip"><span class="cx-tag">anl 2.1.1</span></span>
+          <button class="cx-btn primary">立即触发</button>
+        </div>
+        <div style="margin-top:12px" class="cx-note">下次锚点 06:30（日出），过渡带 30 分钟。</div>
+      </div>
+
+      <div class="fx-grid">
+        <div class="fx-card">
+          <h2>卧室灯</h2>
+          <div class="cx-status">
+            <span class="cx-chip tone-ok"><span class="fx-lamp ok breath"></span>VERIFIED</span>
+            <span class="cx-chip">12%</span>
+          </div>
+          <div style="margin-top:12px" class="cx-bar"><div class="fill" style="width:12%"></div></div>
+        </div>
+        <div class="fx-card">
+          <h2>走廊灯</h2>
+          <div class="cx-status">
+            <span class="cx-chip tone-err"><span class="fx-lamp err"></span>MISMATCH</span>
+            <button class="cx-btn danger">重校</button>
+          </div>
+          <div style="margin-top:12px" class="cx-note err">上次校验偏差 8%，超过容差 5%。</div>
+        </div>
+      </div>
+
+      <div class="fx-card">
+        <h2>锚点时刻表</h2>
+        <table class="cx-table">
+          <thead><tr><th>时刻</th><th>类型</th><th>过渡带</th><th class="num">目标亮度</th></tr></thead>
+          <tbody>
+            <tr><td class="num">06:30</td><td>日出锚点</td><td class="num">30min</td><td class="num">80%</td></tr>
+            <tr><td class="num">22:00</td><td>夜间锚点</td><td class="num">30min</td><td class="num">12%</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // 灯组呼吸演示：点顶栏灯在 ok/err 间切换，检查两种状态的观感
+  document.querySelector(".fx-lamp").addEventListener("click", function () {
+    this.classList.toggle("ok");
+    this.classList.toggle("err");
+    this.classList.toggle("breath");
+  });
+</script>
+</body>
+</html>
