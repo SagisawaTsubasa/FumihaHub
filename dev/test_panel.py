@@ -183,6 +183,94 @@ def run_checks(browser, base: str) -> None:
     )
     check("ack toast after write", True)
 
+    # ---- reload window: vanished SELECTED page must not kick the user ----
+    # (FXH-F-029/F-030: the vanished id must be the selected one, or the
+    # hold branch never executes and the assertions pass on broken code.)
+    page.evaluate("() => { location.hash = 'pn=anl.main'; }")
+    wait_shadow(page, '[data-stub="anl"]', "anl selected as the baseline")
+    page.evaluate("() => { location.hash = 'pn=luxbalance.main'; }")
+    wait_shadow(page, '[data-stub="lux"]', "lux selected before vanish")
+    page.evaluate("() => window.__vanishLux()")   # selected lux disappears
+    page.evaluate("""async () => {
+      // _poll has a single-flight guard: a scheduled poll in flight would
+      // swallow the manual call — poll until the dir_rev actually moved.
+      const p = document.getElementById('hub');
+      const before = p._dir ? p._dir.dir_rev : -1;
+      for (let i = 0; i < 20; i++) {
+        await p._poll();
+        if (p._dir && p._dir.dir_rev !== before) break;
+        await new Promise((r) => setTimeout(r, 50));
+      }
+    }""")
+    still = page.evaluate("() => location.hash")
+    mounted = page.evaluate(
+        """() => {
+          const p = document.getElementById('hub');
+          return !!(p.shadowRoot.querySelector('[data-stub="lux"]') ||
+                    [...p.shadowRoot.querySelectorAll('*')].some(
+                      (el) => el.shadowRoot && el.shadowRoot.querySelector('[data-stub="lux"]')));
+        }"""
+    )
+    check("vanish: selection held for one directory change",
+          "pn=luxbalance.main" in still and mounted, f"{still} mounted={mounted}")
+    page.evaluate("""async () => {
+      const p = document.getElementById('hub');
+      const before = p._dir ? p._dir.dir_rev : -1;
+      window.__bumpRev();
+      for (let i = 0; i < 20; i++) {
+        await p._poll();
+        if (p._dir && p._dir.dir_rev !== before) break;
+        await new Promise((r) => setTimeout(r, 50));
+      }
+    }""")
+    # Bounded fallback (FXH-F-032): selection lands on anl AND the hash is
+    # rewritten to match — the shell's "make the URL shareable" step must
+    # happen; a variant that holds the stale selection or skips the hash
+    # write must fail this wait.
+    page.wait_for_function(
+        """() => {
+          const p = document.getElementById('hub');
+          const sel = p.shadowRoot.querySelector('.fx-tab[aria-selected="true"]');
+          return !!sel && sel.dataset.pageId === 'anl.main'
+            && location.hash.indexOf('pn=anl.main') !== -1;
+        }""",
+        timeout=6000,
+    )
+    check("next directory change takes the normal fallback", True)
+
+    # ---- directory fully collapsed while selected: honest empty-state card ----
+    page.evaluate("() => { location.hash = 'pn=anl.main'; }")
+    wait_shadow(page, '[data-stub="anl"]', "anl re-selected before emptyDir test")
+    page.evaluate("() => window.__emptyDir()")   # whole directory zeroes out
+    page.evaluate("""async () => {
+      const p = document.getElementById('hub');
+      const before = p._dir ? p._dir.dir_rev : -1;
+      for (let i = 0; i < 20; i++) {
+        await p._poll();
+        if (p._dir && p._dir.dir_rev !== before) break;
+        await new Promise((r) => setTimeout(r, 50));
+      }
+    }""")
+    empty_now = page.evaluate(
+        """() => {
+          const p = document.getElementById('hub');
+          let stalePage = false;
+          for (const el of p.shadowRoot.querySelectorAll('*')) {
+            if (el.shadowRoot && el.shadowRoot.querySelector('[data-stub="anl"]')) {
+              stalePage = true;
+              break;
+            }
+          }
+          return {
+            emptyCard: !!p.shadowRoot.querySelector('.fx-content .fx-empty'),
+            staleGone: !stalePage,   // the stranded mount must be unmounted
+            hash: location.hash,
+          };
+        }"""
+    )
+    check("collapsed directory swaps to empty-state card",
+          bool(empty_now["emptyCard"] and empty_now["staleGone"]), str(empty_now))
+
     check("no page errors so far", not errors, "; ".join(errors[:3]))
 
     # ---- 6: failapi -------------------------------------------------------------
@@ -214,6 +302,10 @@ def run_checks(browser, base: str) -> None:
     )
     check("error card has retry", bool(card and card["retry"]), str(card))
     page3.close()
+
+    # vanish/emptyDir left the fixture directory collapsed — restore it for
+    # the reconnect case below, which needs both tabs present.
+    page.evaluate("() => window.__restoreHub()")
 
     # ---- reconnect: SAME-INSTANCE detach/reattach (FXH-F-001/F-020) --------
     # HA reuses the panel element across sidebar visits: only a same-instance

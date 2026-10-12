@@ -13,7 +13,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, callback
 
 from .const import DOMAIN
-from .registry import BUS_EVENT_PAGE_CHANGED
+from .registry import BUS_EVENT_PAGE_CHANGED, REGISTRY_KEY, get_registry
 from .web import async_setup_web, async_unload_web
 
 _LOGGER = logging.getLogger(__name__)
@@ -52,6 +52,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         state = HubState()
         hass.data[DOMAIN] = state
 
+    # The registry dict must exist as soon as the shell entry is set up:
+    # consumers detect the hub by "fumiha_hub_registry" in hass.data, and a
+    # lazily-created dict (first directory request) would make that probe
+    # wrong in both directions — cold start falls back to standalone panels
+    # even though the hub is loaded, and after the hub entry is removed the
+    # leftover dict keeps consumers writing descriptors into the void
+    # (lux_balance LX-F-001).
+    get_registry(hass)
+
     # Consumers may have loaded (and registered pages) before the hub did;
     # a revision bump here makes the first directory poll pick them up.
     state.dir_rev += 1
@@ -76,5 +85,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Entry removed: drop the runtime state (registry dict is shared and stays)."""
+    """Entry removed: drop the runtime state.
+
+    The shared registry dict goes with it: consumers probe the hub by the
+    key's existence (LX-F-001 lifetime contract), and a leftover dict would
+    keep them writing descriptors nobody reads. Consumers re-register their
+    fallback panels on their next reload.
+    """
     hass.data.pop(DOMAIN, None)
+    hass.data.pop(REGISTRY_KEY, None)

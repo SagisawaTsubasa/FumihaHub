@@ -12,26 +12,41 @@
 
 ## 页面接入（集成开发者）
 
-集成**不 import** 本包，契约只有两个字符串常量 + 一个 dict（见
-`custom_components/fumiha_hub/registry.py` 模块文档）：
+集成**不 import** 本包，契约只有两个字符串常量 + 一个 dict（完整生命周期契约见
+`custom_components/fumiha_hub/registry.py` 模块文档）。**先探针、后写入**：
+键存在 ⇔ 壳条目已加载且未删除——绝不要自己 `setdefault` 创建这个 dict（那会让
+之后的探针永远为真，无壳环境下页面不可达）：
 
 ```python
-# async_setup_entry 里（hub 在或不在都安全）：
-registry = hass.data.setdefault("fumiha_hub_registry", {})
-registry["<provider>.<page>"] = {
-    "id": "<provider>.<page>",          # 首段 = 页签 provider 徽标
-    "title": "页面标题",
-    "icon": "mdi:...",                  # 预留
-    "order": 10,                        # 越小越靠前
-    "version": "<你的 manifest 版本>",   # module_url 缓存戳
-    "module_url": "/<domain>/page.js?ver=<版本>",  # 集成自己的静态路径
-    "element": "<provider>-page",       # 模块定义的自定义元素名
-}
-hass.bus.async_fire("fumiha_hub_page_changed", {"id": "...", "action": "register"})
+PAGE_ID = "<provider>.<page>"
 
-# async_unload_entry 里：
-registry.pop("<provider>.<page>", None)
-hass.bus.async_fire("fumiha_hub_page_changed", {"id": "...", "action": "unregister"})
+def _register_page(hass) -> None:
+    # async_setup_entry 尾部调用；壳加载顺序竞态可在 EVENT_HOMEASSISTANT_STARTED
+    # 时重判一次（lux_balance web.py 是参考实现）
+    if "fumiha_hub_registry" in hass.data:
+        # 壳在场：写描述符，壳的页签自动出现
+        hass.data["fumiha_hub_registry"][PAGE_ID] = {
+            "id": PAGE_ID,                      # 首段 = 页签 provider 徽标
+            "title": "页面标题",
+            "icon": "mdi:...",                  # 预留
+            "order": 10,                        # 越小越靠前
+            "version": "<你的 manifest 版本>",   # module_url 缓存戳
+            "module_url": "/<domain>/page.js?ver=<版本>",  # 集成自己的静态路径
+            "element": "<provider>-page",       # 模块定义的自定义元素名
+        }
+        hass.bus.async_fire("fumiha_hub_page_changed", {"id": PAGE_ID, "action": "register"})
+    else:
+        # 壳缺席：回落注册你自己的独立侧边栏面板（frontend.async_register_built_in_panel）
+        ...
+
+def _unregister_page(hass) -> None:
+    # async_unload_entry（最后一个条目卸载时）调用；与注册模式对称
+    if "fumiha_hub_registry" in hass.data:
+        hass.data["fumiha_hub_registry"].pop(PAGE_ID, None)
+        hass.bus.async_fire("fumiha_hub_page_changed", {"id": PAGE_ID, "action": "unregister"})
+    else:
+        # frontend.async_remove_panel(...)
+        ...
 ```
 
 页面模块（ES module，经壳 `import()` 动态加载）：
@@ -45,8 +60,8 @@ window.FUMIHA.kit.defineOnce("<provider>-page",
   });
 ```
 
-壳未安装时上述代码照常执行（dict 无人读取而已）——集成可据此检测
-`"fumiha_hub_registry" in hass.data` 决定是否回落注册自己的独立面板。
+lux_balance 的 `web.py` 是按本契约实现的参考（双路径 + started 自愈 +
+模式重判）。
 
 ## 开发
 

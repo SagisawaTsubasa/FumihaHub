@@ -9,6 +9,7 @@
                       (import-failure error card path)
     ?single=1      -> only one stub page in the directory
     ?none=1        -> empty directory (zero-page empty-state card path)
+    runtime: window.__vanishLux() / window.__emptyDir() mutate the live directory
     ?rev=N         -> initial directory dir_rev (default 3)
     ?earlyhass=1   -> assign hass BEFORE custom-element upgrade (pre-upgrade
                       own-property shadowing path; needs the harness script
@@ -43,10 +44,23 @@
   var revBase = parseInt(params.get("rev") || "3", 10);
   var revBumps = 0;
   window.__bumpRev = function () { revBumps += 1; };
+  // FXH-F-029/030: vanish the lux page from the directory (integration
+  // reload window) — consumed by directory() below, bump rev so the shell
+  // re-evaluates its selection. __emptyDir additionally zeroes the whole
+  // directory (the "selected page + directory collapsed" scenario).
+  var vanished = false;
+  var emptyDir = false;
+  window.__vanishLux = function () { vanished = true; revBumps += 1; };
+  window.__emptyDir = function () { emptyDir = true; revBumps += 1; };
+  window.__restoreHub = function () { vanished = false; emptyDir = false; revBumps += 1; };
 
   function directory() {
-    var panels = params.has("none") ? [] : [
-      {
+    // vanished/emptyDir are runtime toggles (window.__vanishLux /
+    // window.__emptyDir): they remove the lux page / zero the whole
+    // directory and bump the rev, simulating an integration reload window
+    // or a collapsed registry (FXH-F-029/F-030).
+    var panels = params.has("none") || emptyDir ? [] : [
+      ...(vanished ? [] : [{
         id: "luxbalance.main",
         title: "亮度均衡",
         icon: "mdi:lightbulb-auto",
@@ -54,7 +68,7 @@
         version: "0.0.0",
         module_url: luxModule,
         element: "lux-stub-page",
-      },
+      }]),
       ...(params.has("single") ? [] : [{
         id: "anl.main",
         title: "夜灯助手",
