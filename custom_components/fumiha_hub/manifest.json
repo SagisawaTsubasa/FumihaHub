@@ -1,12 +1,18 @@
 {
   "domain": "fumiha_hub",
   "name": "Fumiha Hub 文羽面板",
-  "codeowners": ["@SagisawaTsubasa"],
+  "codeowners": [
+    "@SagisawaTsubasa"
+  ],
   "config_flow": true,
-  "dependencies": ["http", "frontend"],
+  "dependencies": [
+    "http",
+    "frontend"
+  ],
   "documentation": "https://github.com/SagisawaTsubasa/FumihaHub",
   "integration_type": "hub",
   "iot_class": "calculated",
   "requirements": [],
-  "version": "0.1.0"
+  "version": "0.1.0",
+  "issue_tracker": "https://github.com/SagisawaTsubasa/FumihaHub/issues"
 }
