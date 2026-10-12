@@ -42,7 +42,6 @@ class HubDevHandler(SimpleHTTPRequestHandler):
         # static mount never does. Send a clean 404 instead (FXH-F-024);
         # returning None tells do_GET there is no body to copy.
         self.send_error(404, "Directory listing not supported")
-        return None
 
     def translate_path(self, path: str) -> str:
         # Same order as stdlib: strip query/fragment, then percent-decode —

@@ -441,6 +441,24 @@ body * {
   color: var(--fx-sub);
 }
 
+/* text/number input (pages build forms from these) */
+.cx-input {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--fx-edge);
+  background: var(--fx-panel);
+  color: var(--fx-txt);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  min-height: 24px;
+  width: 110px;
+}
+
+.cx-input:focus-visible {
+  outline: 2px solid var(--fx-accent);
+  outline-offset: 1px;
+}
+
 /* --------------------------------------------------------------------------
    Feedback: toast, error card, empty state
    -------------------------------------------------------------------------- */

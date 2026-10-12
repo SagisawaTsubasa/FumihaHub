@@ -44,6 +44,16 @@ def get_registry(hass: HomeAssistant) -> dict[str, Any]:
 
     Safe to call from consumer integrations and from the hub alike; the
     lazily-created dict survives hub entry reloads.
+
+    Lifetime contract (consumers may rely on this): the hub's
+    ``async_setup_entry`` calls this on every boot and its
+    ``async_remove_entry`` deletes the dict, so **"key exists" means the hub
+    entry has been loaded and not removed** — not merely that some browser
+    once opened the panel. The dict survives entry reloads. Known wording
+    gap (FXH-F-026, pending real-device verification): a *disabled* hub
+    entry only unloads, which keeps the dict — consumers probing during a
+    disabled window may write descriptors nobody reads until the hub is
+    re-enabled or removed.
     """
     return hass.data.setdefault(REGISTRY_KEY, {})
 
@@ -108,8 +118,14 @@ def collect_panels(hass: HomeAssistant) -> tuple[list[dict[str, Any]], list[tupl
     Returns (panels, skipped) where skipped carries (id_or_repr, reason)
     for every invalid entry so the caller can log it — invalid entries are
     never silently dropped.
+
+    READ-ONLY on purpose: this runs on every directory poll from any open
+    shell tab, including tabs that outlive the hub entry. Creating the dict
+    here (get_registry) would resurrect the key after the hub entry was
+    removed and re-poison consumers' hub probe (FXH-F-027). Creation is
+    reserved for the hub's own setup.
     """
-    registry = get_registry(hass)
+    registry = hass.data.get(REGISTRY_KEY) or {}
     panels: list[dict[str, Any]] = []
     skipped: list[tuple[str, str]] = []
     for key, raw in registry.items():

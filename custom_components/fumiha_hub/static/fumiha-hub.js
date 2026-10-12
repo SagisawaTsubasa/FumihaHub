@@ -53,6 +53,7 @@ class FumihaHubPanel extends HTMLElement {
     this._importSeq = 0;       // stale-import race guard
     this._mountedElement = null;
     this._mountedVersions = new Map(); // element name -> version first mounted
+    this._lastKnownIds = new Set(); // recently served page ids (reload window)
     this._onHash = this._onHash.bind(this);
   }
 
@@ -150,6 +151,7 @@ class FumihaHubPanel extends HTMLElement {
     this._renderedRev = null;
     this._renderedSel = null;
     this._sel = null;
+    this._lastKnownIds = new Set();
     this._unmount();
 
     this._lamp = kit.el("span", { class: "fx-lamp", title: "连接状态" });
@@ -218,8 +220,12 @@ class FumihaHubPanel extends HTMLElement {
       const revChanged = !this._dir || dir.dir_rev !== this._dir.dir_rev;
       this._dir = dir;
       if (revChanged) {
+        // Snapshot what the PREVIOUS directory knew before re-rendering:
+        // _renderTabs overwrites _lastKnownIds with the new panel list, and
+        // the reload-window decision needs the old set (FXH-F-025).
+        const wasKnown = this._lastKnownIds;
         this._renderTabs();
-        this._ensureSelection();
+        this._ensureSelection(wasKnown);
       }
       this._renderMeta();
     } catch (err) {
@@ -260,6 +266,10 @@ class FumihaHubPanel extends HTMLElement {
     this._renderedSel = this._sel;
     this._tabHost.replaceChildren();
     const panels = this._dir.panels;
+    // "Current known set" — every rendered directory (empty or not)
+    // overwrites it; _poll snapshots the PREVIOUS value for the
+    // reload-window decision (FXH-F-025).
+    this._lastKnownIds = new Set(panels.map((p) => p.id));
     if (!panels.length) {
       this._tabHost.append(
         kit.el("span", {
@@ -294,12 +304,24 @@ class FumihaHubPanel extends HTMLElement {
     return m ? m[1] : null;
   }
 
-  _ensureSelection() {
+  _ensureSelection(wasKnown) {
     if (!this._dir) return;
     const panels = this._dir.panels;
     const wanted = this._selectedFromHash();
     if (wanted && panels.some((p) => p.id === wanted)) {
       this._select(wanted);
+      return;
+    }
+    // A page id the PREVIOUS directory served but that just vanished is
+    // almost certainly an integration mid-reload (unregister → register
+    // within seconds). Hold the current selection for exactly this one
+    // directory change (LX-F-011 / FXH-F-025): the next rev change without
+    // the page back takes the normal fallback below. A directory that went
+    // fully empty still gets the honest empty-state card instead of a
+    // zombie mount.
+    if (wanted && wasKnown && wasKnown.has(wanted)) {
+      if (panels.length) return;
+      this._select(null);
       return;
     }
     // Unknown or missing deep link: fall back to the first tab and make the

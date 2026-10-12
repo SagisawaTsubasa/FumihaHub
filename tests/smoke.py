@@ -296,6 +296,12 @@ async def main_async() -> None:
 
     ok = await init_mod.async_setup_entry(hass, entry)
     check("setup returns True", ok is True)
+    # 键生命周期契约（FXH-F-029）：setup 即创建（消费者探针语义），remove 即清除
+    check(
+        "setup creates registry key (hub probe truthiness)",
+        registry_mod.REGISTRY_KEY in hass.data,
+        "consumers probe by key existence",
+    )
     check("views registered", len(hass.http.views) == 1, f"got {len(hass.http.views)}")
     check("static registered", len(hass.http.static) == 1, f"got {len(hass.http.static)}")
     check(
@@ -355,6 +361,28 @@ async def main_async() -> None:
         len(hass.bus.listeners) == 1,
         str(hass.bus.listeners),
     )
+
+    # 只读目录视图不得复活被清掉的 registry 键（FXH-F-027）
+    del hass.data[registry_mod.REGISTRY_KEY]
+    _view = hass.http.views[0]
+    _resp = await _view.get(FakeRequest(hass))
+    check(
+        "directory view is read-only on the registry key",
+        registry_mod.REGISTRY_KEY not in hass.data,
+        "view must not re-create the dict",
+    )
+    # remove 清键（FXH-F-029）
+    await init_mod.async_setup_entry(hass, entry)
+    assert registry_mod.REGISTRY_KEY in hass.data
+    await init_mod.async_remove_entry(hass, entry)
+    check(
+        "remove deletes registry key (probe falls back)",
+        registry_mod.REGISTRY_KEY not in hass.data,
+        "probe must go false after hub removal",
+    )
+
+    # remove_entry 同时清了 hub 运行态——重新 setup 供后续各节使用
+    await init_mod.async_setup_entry(hass, entry)
 
     # 4. registry -> directory view ----------------------------------------
     hass.data[registry_mod.REGISTRY_KEY] = {
