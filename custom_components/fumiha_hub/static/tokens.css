@@ -147,6 +147,27 @@ body * {
   animation: fx-breathe 2.4s ease-in-out infinite;
 }
 
+/* mobile sidebar opener (hidden unless the shell sets display when narrow) */
+.fx-menubtn {
+  display: none;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid var(--fx-edge);
+  background: transparent;
+  color: var(--fx-txt);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  flex: none;
+}
+
+.fx-menubtn:hover {
+  border-color: var(--fx-accent);
+  color: var(--fx-accent);
+}
+
 /* tab strip */
 .fx-tabs {
   display: flex;

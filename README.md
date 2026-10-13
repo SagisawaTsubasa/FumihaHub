@@ -63,6 +63,11 @@ window.FUMIHA.kit.defineOnce("<provider>-page",
 lux_balance 的 `web.py` 是按本契约实现的参考（双路径 + started 自愈 +
 模式重判）。
 
+### 已知边界
+
+- **移动端**：HA 的 `panel_custom` 面板不自带顶栏——v0.1.2 起壳在窄屏（侧边栏收起）时自绘「☰」按钮打开侧边栏（派发官方 `hass-toggle-menu` 事件）。Android Companion App v5+ 对该事件有社区报告的失效案例，如遇请用侧边栏原生入口并反馈。
+- **运行期删除壳集成**：消费方页面短暂不可达，消费方重载后回落为独立侧边栏面板（见接入契约）。
+
 ## 开发
 
 ```bash
