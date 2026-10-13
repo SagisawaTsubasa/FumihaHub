@@ -77,6 +77,21 @@ class FumihaHubPanel extends HTMLElement {
     // HA path routing is unused; the single route is the hash below.
   }
 
+  set narrow(value) {
+    // HA injects this on panel elements (true when the sidebar is
+    // collapsed/mobile: media query 870px + dockedSidebar=always_hidden).
+    // FXH-F-033: panel_custom renders NO app bar — without our own menu
+    // button there is no way to reopen the sidebar on a phone.
+    this._narrow = !!value;
+    if (this._menuBtn) {
+      this._menuBtn.style.display = this._narrow ? "" : "none";
+    }
+  }
+
+  get narrow() {
+    return !!this._narrow;
+  }
+
   connectedCallback() {
     // A hass assignment that landed before custom-element upgrade created an
     // own property shadowing the prototype setter — re-route it through the
@@ -158,9 +173,30 @@ class FumihaHubPanel extends HTMLElement {
     this._age = kit.el("span", { text: "—" });
     this._rev = kit.el("span", { text: "" });
     this._metaHost = kit.el("div", { class: "fx-meta" }, this._lamp, this._age, this._rev);
+    // Mobile sidebar opener (FXH-F-033): panel_custom gets no app bar from
+    // HA, and the drawer only supports swipe-to-CLOSE — without this button
+    // a phone has no way back to the sidebar. hass-toggle-menu (bubbles +
+    // composed) is the official cross-shadow signal the shell listens for.
+    this._menuBtn = kit.el("button", {
+      class: "fx-menubtn",
+      "aria-label": "打开侧边栏",
+      title: "打开侧边栏",
+      text: "☰",
+      onclick: () => {
+        this.dispatchEvent(
+          new CustomEvent("hass-toggle-menu", {
+            bubbles: true,
+            composed: true,
+            detail: { open: true },
+          })
+        );
+      },
+    });
+    this._menuBtn.style.display = this._narrow ? "" : "none";
     const topbar = kit.el(
       "header",
       { class: "fx-topbar" },
+      this._menuBtn,
       kit.el("h1", { text: "文羽面板" }),
       this._metaHost
     );

@@ -183,6 +183,54 @@ def run_checks(browser, base: str) -> None:
     )
     check("ack toast after write", True)
 
+    # ---- narrow: menu button + hass-toggle-menu event (FXH-F-033) ----
+    # MockHass page does not set narrow; drive it manually like HA would.
+    page.evaluate(
+        """async () => {
+          const p = document.getElementById('hub');
+          window.__menuEvents = [];
+          window.addEventListener('hass-toggle-menu',
+            (e) => window.__menuEvents.push(e.detail), { once: true });
+          p.narrow = true;
+          await new Promise((r) => setTimeout(r, 50));
+        }"""
+    )
+    btn = page.evaluate(
+        """() => {
+          const p = document.getElementById('hub');
+          const b = p.shadowRoot.querySelector('.fx-menubtn');
+          return b ? {visible: b.style.display !== 'none'} : null;
+        }"""
+    )
+    check("narrow=true shows menu button", bool(btn and btn["visible"]), str(btn))
+    page.evaluate(
+        """() => {
+          const p = document.getElementById('hub');
+          p.shadowRoot.querySelector('.fx-menubtn').click();
+        }"""
+    )
+    menu_fired = page.evaluate("() => window.__menuEvents")
+    check(
+        "menu button fires hass-toggle-menu (open)",
+        len(menu_fired) == 1 and menu_fired[0].get("open") is True,
+        str(menu_fired),
+    )
+    page.evaluate(
+        """async () => {
+          const p = document.getElementById('hub');
+          p.narrow = false;
+          await new Promise((r) => setTimeout(r, 50));
+        }"""
+    )
+    btn2 = page.evaluate(
+        """() => {
+          const p = document.getElementById('hub');
+          const b = p.shadowRoot.querySelector('.fx-menubtn');
+          return b ? {visible: b.style.display !== 'none'} : null;
+        }"""
+    )
+    check("narrow=false hides menu button", bool(btn2 and not btn2["visible"]), str(btn2))
+
     # ---- reload window: vanished SELECTED page must not kick the user ----
     # (FXH-F-029/F-030: the vanished id must be the selected one, or the
     # hold branch never executes and the assertions pass on broken code.)
