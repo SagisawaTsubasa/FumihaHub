@@ -1,0 +1,300 @@
+{
+  "version": 1,
+  "created_at": "2026-10-28T18:14:43Z",
+  "updated_at": "2026-10-28T18:18:04Z",
+  "files": {
+    ".gitattributes": {
+      "role": "index",
+      "sha256": "21fa16a2122e2b0360b47502c577428b645437e08e9e87ffba661f84853cb476",
+      "size": 291,
+      "normalized_sha256": "21fa16a2122e2b0360b47502c577428b645437e08e9e87ffba661f84853cb476"
+    },
+    ".github/workflows/validate.yml": {
+      "role": "index",
+      "sha256": "3b18697b32065feba42c5ca320f62f5b1f10ea4320ce95a5fa17b2b2e5e61fd3",
+      "size": 1753,
+      "normalized_sha256": "3b18697b32065feba42c5ca320f62f5b1f10ea4320ce95a5fa17b2b2e5e61fd3"
+    },
+    ".gitignore": {
+      "role": "index",
+      "sha256": "2d3de312b39d34a7a14b25e03164341319b6a70e5b782de969f005734a4822f3",
+      "size": 77,
+      "normalized_sha256": "2d3de312b39d34a7a14b25e03164341319b6a70e5b782de969f005734a4822f3"
+    },
+    "AGENTS.md": {
+      "role": "index",
+      "sha256": "ddb50101a5be7eb54bde0bdccb2ce15fbac13a0efed1b2851adc248c7a39bcb7",
+      "size": 13258,
+      "normalized_sha256": "ddb50101a5be7eb54bde0bdccb2ce15fbac13a0efed1b2851adc248c7a39bcb7"
+    },
+    "LICENSE": {
+      "role": "index",
+      "sha256": "9c0e85af7766dffc5d5acdf284bc720841e6caceee2a688d018a8339f41aa759",
+      "size": 1072,
+      "normalized_sha256": "9c0e85af7766dffc5d5acdf284bc720841e6caceee2a688d018a8339f41aa759"
+    },
+    "README.md": {
+      "role": "index",
+      "sha256": "9e91f32d963be2c6e7959c1c98d7d8b784daf7b3147314b6550e1ac3d237921c",
+      "size": 4116,
+      "normalized_sha256": "9e91f32d963be2c6e7959c1c98d7d8b784daf7b3147314b6550e1ac3d237921c"
+    },
+    "aoci.code.txt": {
+      "role": "index",
+      "sha256": "c29e78a23e0649f80d514690f11408fe3a73e53d0de04d32f656eca3238e0d74",
+      "size": 8202,
+      "normalized_sha256": "c29e78a23e0649f80d514690f11408fe3a73e53d0de04d32f656eca3238e0d74"
+    },
+    "aoci.meta.txt": {
+      "role": "index",
+      "sha256": "fbc304fa05182547e96f1f8404c7c30ad6c366bba9589523f1019c2c1da0427c",
+      "size": 1989,
+      "normalized_sha256": "fbc304fa05182547e96f1f8404c7c30ad6c366bba9589523f1019c2c1da0427c"
+    },
+    "aoci.txt": {
+      "role": "index",
+      "sha256": "3bebee19acc6572ff8a6984541af7733b50e6cea108a78e4473d55e30916bdd3",
+      "size": 298,
+      "normalized_sha256": "3bebee19acc6572ff8a6984541af7733b50e6cea108a78e4473d55e30916bdd3"
+    },
+    "custom_components/fumiha_hub/__init__.py": {
+      "role": "index",
+      "sha256": "0dbb994668ea3516eed58b69e5ae23e9bcaf746bae5cea9cd7c60be626f50c39",
+      "size": 3435,
+      "normalized_sha256": "0dbb994668ea3516eed58b69e5ae23e9bcaf746bae5cea9cd7c60be626f50c39"
+    },
+    "custom_components/fumiha_hub/brand/icon.png": {
+      "role": "index",
+      "sha256": "f656de034c4c8dbcc47714f2ab81d8b1669fe069df1e35f87123d065fd5ef171",
+      "size": 2043
+    },
+    "custom_components/fumiha_hub/brand/icon@2x.png": {
+      "role": "index",
+      "sha256": "3dba2a35399bb1f844e8ed5ff12e2efceeba1758939b0d3b40b43ca3a8673fcc",
+      "size": 4438
+    },
+    "custom_components/fumiha_hub/brand/logo.png": {
+      "role": "index",
+      "sha256": "3d2c7c2e1544441a84a45f65652f7cbe17c2da5d58cee469e40a0856f2a560cb",
+      "size": 953
+    },
+    "custom_components/fumiha_hub/brand/logo@2x.png": {
+      "role": "index",
+      "sha256": "f656de034c4c8dbcc47714f2ab81d8b1669fe069df1e35f87123d065fd5ef171",
+      "size": 2043
+    },
+    "custom_components/fumiha_hub/config_flow.py": {
+      "role": "index",
+      "sha256": "b6546aeef0715b9e0977b0feb9ed0446459523af2b718d2981f8aff08023a524",
+      "size": 947,
+      "normalized_sha256": "b6546aeef0715b9e0977b0feb9ed0446459523af2b718d2981f8aff08023a524"
+    },
+    "custom_components/fumiha_hub/const.py": {
+      "role": "index",
+      "sha256": "cd18cbc7086bfa8036ae8ba85d53a4aed27f081fd541c1bf4d6fd77cf278f2ff",
+      "size": 421,
+      "normalized_sha256": "cd18cbc7086bfa8036ae8ba85d53a4aed27f081fd541c1bf4d6fd77cf278f2ff"
+    },
+    "custom_components/fumiha_hub/manifest.json": {
+      "role": "index",
+      "sha256": "e199b47c6381e0c2fb221eba3f7eb1a5a2ed80c01d9296e762ddd111e1611494",
+      "size": 430,
+      "normalized_sha256": "e199b47c6381e0c2fb221eba3f7eb1a5a2ed80c01d9296e762ddd111e1611494"
+    },
+    "custom_components/fumiha_hub/registry.py": {
+      "role": "index",
+      "sha256": "8d3cfb445670e1d313d47e02864a449296906df68c9b9d1cb45122f292def9b6",
+      "size": 5931,
+      "normalized_sha256": "8d3cfb445670e1d313d47e02864a449296906df68c9b9d1cb45122f292def9b6"
+    },
+    "custom_components/fumiha_hub/static/fumiha-hub.js": {
+      "role": "index",
+      "sha256": "8fda8cf86bb5906c98bfe6b420022d98d1f67c2a8ed9727398964535ea908ae9",
+      "size": 16845,
+      "normalized_sha256": "8fda8cf86bb5906c98bfe6b420022d98d1f67c2a8ed9727398964535ea908ae9"
+    },
+    "custom_components/fumiha_hub/static/kit.js": {
+      "role": "index",
+      "sha256": "410a8bd9ba2ab17e01cfb4296b542c847957006fa2e0bc91f310c0239a2427d3",
+      "size": 10541,
+      "normalized_sha256": "410a8bd9ba2ab17e01cfb4296b542c847957006fa2e0bc91f310c0239a2427d3"
+    },
+    "custom_components/fumiha_hub/static/tokens.css": {
+      "role": "index",
+      "sha256": "17968edff9dfb5c3ca5809050cb4a678346dbfe80f7b47a780047c82fb39d981",
+      "size": 13206,
+      "normalized_sha256": "17968edff9dfb5c3ca5809050cb4a678346dbfe80f7b47a780047c82fb39d981"
+    },
+    "custom_components/fumiha_hub/strings.json": {
+      "role": "index",
+      "sha256": "8a347dbd6cff5ffbaaa12c9781a96432ac1ee0f0f7c2606b7aaffd0cfc4a9917",
+      "size": 318,
+      "normalized_sha256": "8a347dbd6cff5ffbaaa12c9781a96432ac1ee0f0f7c2606b7aaffd0cfc4a9917"
+    },
+    "custom_components/fumiha_hub/translations/en.json": {
+      "role": "index",
+      "sha256": "02c423183c1d83668047f18cbc26bea754f02ac941b6a4524c21446f720f40c7",
+      "size": 326,
+      "normalized_sha256": "02c423183c1d83668047f18cbc26bea754f02ac941b6a4524c21446f720f40c7"
+    },
+    "custom_components/fumiha_hub/translations/zh-Hans.json": {
+      "role": "index",
+      "sha256": "8a347dbd6cff5ffbaaa12c9781a96432ac1ee0f0f7c2606b7aaffd0cfc4a9917",
+      "size": 318,
+      "normalized_sha256": "8a347dbd6cff5ffbaaa12c9781a96432ac1ee0f0f7c2606b7aaffd0cfc4a9917"
+    },
+    "custom_components/fumiha_hub/web.py": {
+      "role": "index",
+      "sha256": "9e626604b238fb875583a32a9d5da9bc5e32806a530604307348d53cdd8fa044",
+      "size": 4196,
+      "normalized_sha256": "9e626604b238fb875583a32a9d5da9bc5e32806a530604307348d53cdd8fa044"
+    },
+    "dev/index.html": {
+      "role": "index",
+      "sha256": "82393d8b4b6f1b16b9749e5a6fe94a10d72aebb5390c7e244fc8fa0c0f53d046",
+      "size": 6006,
+      "normalized_sha256": "82393d8b4b6f1b16b9749e5a6fe94a10d72aebb5390c7e244fc8fa0c0f53d046"
+    },
+    "dev/serve.py": {
+      "role": "index",
+      "sha256": "2d545e8865b0eb77f81a1769433231bcbf6334b99e8e1ce24c0b217ad6254785",
+      "size": 3540,
+      "normalized_sha256": "2d545e8865b0eb77f81a1769433231bcbf6334b99e8e1ce24c0b217ad6254785"
+    },
+    "dev/shots/p0-dark-desktop.png": {
+      "role": "index",
+      "sha256": "c0c5d3712876531724800e9c2ff7cdb987c3334bd841e5110bdb355cd46011bc",
+      "size": 25040
+    },
+    "dev/shots/p0-dark-narrow.png": {
+      "role": "index",
+      "sha256": "b4368e60d0a5498ac67825c9f16a26c5d206cf16e14d765071e7fdfe25a7e2e3",
+      "size": 22186
+    },
+    "dev/shots/p0-light-desktop.png": {
+      "role": "index",
+      "sha256": "5b2d3b6d398bb96152aa8a65b688cd297a3615513765e0115b5197429b5d849e",
+      "size": 27662
+    },
+    "dev/shots/p0-light-narrow.png": {
+      "role": "index",
+      "sha256": "a2fdb602d52e5e23045589560ec3a0f4817a8ee8a534827e2eded129a1d2a0bf",
+      "size": 24395
+    },
+    "dev/shots/real-zero-page.png": {
+      "role": "index",
+      "sha256": "1787778b32ab306f0da95fac09d5bd6ae13028eb26415ced7ba3b5c8fe2269ef",
+      "size": 136608
+    },
+    "dev/stub-pages/anl-stub.js": {
+      "role": "index",
+      "sha256": "8e77eae3e6b104b523d8e0927d6a160bf400962cb1edc92455c290fb8dbda326",
+      "size": 2916,
+      "normalized_sha256": "8e77eae3e6b104b523d8e0927d6a160bf400962cb1edc92455c290fb8dbda326"
+    },
+    "dev/stub-pages/lux-stub.js": {
+      "role": "index",
+      "sha256": "b40c0d36b0a77507cc7509efb24b5db648967e74e0d3e3b7f77a02fc1be2ddb2",
+      "size": 3479,
+      "normalized_sha256": "b40c0d36b0a77507cc7509efb24b5db648967e74e0d3e3b7f77a02fc1be2ddb2"
+    },
+    "dev/test_panel.py": {
+      "role": "observe",
+      "sha256": "8cd6f34ad33d6b41dfc84a2a4c6824feff0219b48ac9da9de29e754ec07e50b4",
+      "size": 18145,
+      "normalized_sha256": "8cd6f34ad33d6b41dfc84a2a4c6824feff0219b48ac9da9de29e754ec07e50b4"
+    },
+    "hacs.json": {
+      "role": "index",
+      "sha256": "00599ee6a43ab643fb61ad10ef116d67349c3cbbd9aea969ceb1a0c86e4259b9",
+      "size": 65,
+      "normalized_sha256": "00599ee6a43ab643fb61ad10ef116d67349c3cbbd9aea969ceb1a0c86e4259b9"
+    },
+    "mockup/shell.html": {
+      "role": "index",
+      "sha256": "e70bea3508451f6d4f477b0a6ce164d0c28178e863350d70c91604c9a9c79279",
+      "size": 4462,
+      "normalized_sha256": "e70bea3508451f6d4f477b0a6ce164d0c28178e863350d70c91604c9a9c79279"
+    },
+    "ruff.toml": {
+      "role": "index",
+      "sha256": "73b3d364d473d981d4699cf9d61aa3b0a5616762dcff2db577299c436d28353b",
+      "size": 172,
+      "normalized_sha256": "73b3d364d473d981d4699cf9d61aa3b0a5616762dcff2db577299c436d28353b"
+    },
+    "tests/smoke.py": {
+      "role": "observe",
+      "sha256": "d1d71c85c929eb7920260f944e35529be916f7e2afd15a1365dd000749363fe9",
+      "size": 17369,
+      "normalized_sha256": "d1d71c85c929eb7920260f944e35529be916f7e2afd15a1365dd000749363fe9"
+    }
+  },
+  "managed_scope": {
+    "version": "managed-scope-baseline/v1",
+    "policy_identity": "3b029307ca9a998f7863146b9aae29089dbd7d695d8e543a5334a9ba32f41394",
+    "observe_change_policy": "review_required",
+    "budget_policy_identity": "15e9b37a6c57e9bf03c9df3d0d049eb5b9a7f5540f9d34960408114e2538a32d",
+    "budget_policy": {
+      "version": "cognition-budget-policy/v1",
+      "mode": "enforce",
+      "whole_index": {
+        "target_tokens": 200000,
+        "warning_tokens": 300000,
+        "max_tokens": 400000
+      },
+      "r": [
+        {
+          "min_c": 1,
+          "max_c": 4,
+          "target_tokens": 25,
+          "max_tokens": 50
+        },
+        {
+          "min_c": 5,
+          "max_c": 7,
+          "target_tokens": 45,
+          "max_tokens": 90
+        },
+        {
+          "min_c": 8,
+          "max_c": 8,
+          "target_tokens": 70,
+          "max_tokens": 140
+        },
+        {
+          "min_c": 9,
+          "max_c": 9,
+          "target_tokens": 90,
+          "max_tokens": 180
+        }
+      ],
+      "s": [
+        {
+          "min_c": 1,
+          "max_c": 4,
+          "target_tokens": 20,
+          "max_tokens": 40
+        },
+        {
+          "min_c": 5,
+          "max_c": 7,
+          "target_tokens": 40,
+          "max_tokens": 80
+        },
+        {
+          "min_c": 8,
+          "max_c": 8,
+          "target_tokens": 70,
+          "max_tokens": 140
+        },
+        {
+          "min_c": 9,
+          "max_c": 9,
+          "target_tokens": 100,
+          "max_tokens": 200
+        }
+      ]
+    },
+    "apply_authorization_mode": "off"
+  }
+}

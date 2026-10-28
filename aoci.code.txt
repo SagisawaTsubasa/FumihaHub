@@ -1,0 +1,42 @@
+#AOCI-CODE-VOLUME: 1
+
+===D:/project/Github/HA/FumihaHub/===
+.gitattributes[XV2T]: F:强制全仓文本以 LF 检出（* text=auto eol=lf），二进制自动豁免，保 AOCI 基线跨平台逐字节一致 | R:- | A:- | S:-
+.gitignore[XV1T]: F:忽略 Python 缓存、ruff 缓存与审查/审计报告类 md（审查报告-*/审计报告-*） | R:- | A:- | S:报告类 md 刻意不入库，属会话产物
+AGENTS.md[SG5S]: F:AOCI 仓库认知接入说明（aoci:begin/end 托管块）：认知建立、复用与维护原则及最小工具入口 | R:code:aoci.txt | A:- | S:托管内容在 aoci:begin/end 标记之间，更新走 AOCI 收尾流程，手工编辑会被覆盖
+LICENSE[SG1T]: F:MIT 许可证全文（Copyright 2026 SagisawaTsubasa） | R:- | A:- | S:-
+README.md[SG7T]: F:项目主文档：共享侧边栏壳定位（框架归壳、页留模组）、页面接入契约全文（先探针后写入/卸载对称的代码样例与描述符字段）、HACS 安装、语言说明（面板中文为主、配置流 en/zh-Hans） | R:code:custom_components/fumiha_hub/registry.py | A:- | S:-
+hacs.json[FV3T]: F:HACS 仓库配置：名称「Fumiha Hub 文羽面板」、render_readme | R:- | A:- | S:-
+ruff.toml[FQ2T]: F:ruff 配置：custom_components.* 归 first-party（isort 分类与工作目录无关） | R:- | A:- | S:-
+
+===D:/project/Github/HA/FumihaHub/.github/workflows/===
+validate.yml[TQ3T]: F:CI 三作业：hassfest、HACS 校验、真实 HA 下全模块 import 检查（push/PR/schedule/dispatch 触发） | R:- | A:- | S:-
+
+===D:/project/Github/HA/FumihaHub/custom_components/fumiha_hub/===
+__init__.py[EB7T]: F:壳集成总入口（单全局条目）：HubState 保 dir_rev 与总线监听、setup 即建 registry dict（消费者探针真源）、监听 page_changed 递增 rev、unload 摘监听与面板、remove 清 runtime+registry | R:code:custom_components/fumiha_hub/registry.py,code:custom_components/fumiha_hub/web.py,code:custom_components/fumiha_hub/const.py | A:async_setup_entry,async_unload_entry,async_remove_entry | S:①registry dict setup 即建，懒建使消费者探针双向失真；②键存在=壳已加载未删（disabled 只 unload 仍留 dict，FXH-F-026）；③setup 先 dir_rev+1 捡先行注册
+config_flow.py[EU5T]: F:配置流：单全局条目，unique_id=DOMAIN 防重复添加；不覆写 OptionsFlow（壳行为是代码，页面选项归页面） | R:code:custom_components/fumiha_hub/const.py | A:async_step_user | S:-
+const.py[CC5T]: F:壳常量：DOMAIN、静态与 REST 路径基（/fumiha_hub、/api/fumiha_hub）、面板 url_path/元素名/侧边栏标题与图标 | R:- | A:- | S:-
+manifest.json[FV3T]: F:集成清单：domain=fumiha_hub、version 0.1.3、integration_type=hub、iot_class=calculated、dependencies http+frontend、requirements 空 | R:- | A:- | S:-
+registry.py[IB8S]: F:壳↔消费者共享页面注册表：hass.data 键 fumiha_hub_registry+bus 事件 fumiha_hub_page_changed 即全部契约；描述符校验（id=provider.page、element 元素名、module_url 同源路径）；collect_panels 只读装配目录 | R:code:custom_components/fumiha_hub/web.py,code:custom_components/fumiha_hub/__init__.py | A:get_registry,validate_descriptor,collect_panels | S:①module_url 校验拒协议相对 //host、反斜杠与控制字符，防跨源导入（FXH-F-003/018）；②collect_panels 刻意只读不建 dict——建则壳删除后键复活毒化探针（FXH-F-027）；③无效描述符永不静默丢，skipped 带 reason 由调用方记日志
+strings.json[FL4T]: F:中文文案源：配置流步骤标题与描述 | R:code:custom_components/fumiha_hub/translations/en.json,code:custom_components/fumiha_hub/config_flow.py | A:- | S:本仓 strings.json 载中文，en.json 载英文——与常见「strings=英文源」约定相反
+web.py[IN7S]: F:web 层：/api/fumiha_hub/panels 目录 REST 视图（auth+admin）、static/ 静态挂载、panel_custom 侧边栏面板（module_url 带 manifest 版本缓存戳）；卸载只摘面板（静态与视图存活于重载） | R:code:custom_components/fumiha_hub/registry.py,code:custom_components/fumiha_hub/const.py,code:custom_components/fumiha_hub/__init__.py | A:async_setup_web,async_unload_web | S:①目录 5s 轮询，无效描述符告警按签名去重（首见 WARNING 复见 DEBUG，FXH-F-010）；②web 注册 flags 守卫每进程一次；③面板 require_admin
+
+===D:/project/Github/HA/FumihaHub/custom_components/fumiha_hub/static/===
+fumiha-hub.js[AU9L]: F:壳前端单件：hash 单路由（#pn=页 id）、目录轮询 Codex 三件套（rev 门+单飞+隐页跳过）、页签渲染与页面 ES module 懒加载、目录失败/badmodule/空目录错误卡、自身 ?ver= 继承给 kit/tokens | R:code:custom_components/fumiha_hub/static/kit.js,code:custom_components/fumiha_hub/static/tokens.css,code:custom_components/fumiha_hub/registry.py,code:custom_components/fumiha_hub/web.py | A:- | S:①轮询三件套缺一即翻车：无 rev 门每 5s 重渲染、无单飞请求堆积、无隐页跳过空耗；②所有静态资产必须继承 ?ver= 缓存戳（WHA-F-052 教训）；③hass 早于元素 upgrade 注入走 own-property 遮蔽路径（dev/?earlyhass=1 专测）
+kit.js[AU7M]: F:前端共享件（classic script 装 window.FUMIHA）：esc/el 安全 DOM 构造（零 innerHTML 插值）、defineOnce 元素注册、fetch 加固包装（超时/保状态/不造假数据/abort 归暂态）、tokens 注入与轮询助手 | R:code:custom_components/fumiha_hub/static/fumiha-hub.js,code:custom_components/fumiha_hub/static/tokens.css | A:- | S:①页面运行时读 window.FUMIHA 不 import（壳带 ?ver= 注入，免构建）；②fetch 包装=WHA 面板 _api 加固超集（WHA-F-140/204/222/236/241 落码）
+tokens.css[AU6L]: F:设计令牌+共享组件类：fx-* 结构令牌骑 HA 主题变量（硬编码兜底）+cx-* 跨页组件类；页 shadow root 内 link 引入 | R:code:custom_components/fumiha_hub/static/kit.js | A:- | S:刻意不取 Codex 固定暗色调——结构令牌必须骑主题变量随暗色自动切换
+
+===D:/project/Github/HA/FumihaHub/custom_components/fumiha_hub/translations/===
+en.json[FL3T]: F:英文配置流文案 | R:code:custom_components/fumiha_hub/strings.json | A:- | S:与 strings.json（中文）不同文，改动勿互覆
+zh-Hans.json[FL4T]: F:简中配置流文案（与 strings.json 逐字节相同） | R:code:custom_components/fumiha_hub/strings.json | A:- | S:与 strings.json 同文双写，改动须两处同步
+
+===D:/project/Github/HA/FumihaHub/dev/===
+index.html[TQ6S]: F:dev harness：真壳+mockHass 走 HTTP，查询开关矩阵（dark/failapi/badmodule/single/none/rev/earlyhass）与运行时钩子（__bumpRev/__vanishLux/__emptyDir）覆盖壳全部分支 | R:code:custom_components/fumiha_hub/static/fumiha-hub.js,code:custom_components/fumiha_hub/dev/serve.py,code:custom_components/fumiha_hub/dev/stub-pages/lux-stub.js | A:- | S:harness 脚本必须保持 classic（非 type=module）——earlyhass 用例要在元素 upgrade 前赋 hass
+serve.py[TQ5T]: F:离线 dev 服务器（stdlib）：镜像 HA 静态挂载（/ →harness、/fumiha_hub/* →真 static、/devstub/* →stub 页），REST 由 mockHass 客户端拦截，服务器纯文件 | R:code:custom_components/fumiha_hub/dev/index.html | A:- | S:-
+
+===D:/project/Github/HA/FumihaHub/dev/stub-pages/===
+anl-stub.js[TQ4T]: F:auto_night_light 占位页（状态机 chips+表格观感样板，仅 dev harness 用） | R:code:custom_components/fumiha_hub/static/kit.js,code:custom_components/fumiha_hub/dev/index.html | A:- | S:-
+lux-stub.js[TQ4T]: F:lux_balance 占位页（验证壳↔页契约与 cx-* 观感、轮询演示，仅 dev harness 用） | R:code:custom_components/fumiha_hub/static/kit.js,code:custom_components/fumiha_hub/dev/index.html | A:- | S:-
+
+===D:/project/Github/HA/FumihaHub/mockup/===
+shell.html[TQ4S]: F:壳观感 mockup（非生产件）：写死假页签假卡片，双击 file:// 可开，相对链引用真 tokens.css | R:code:custom_components/fumiha_hub/static/tokens.css | A:- | S:生产观感=此观感（结构与 class 与壳一致），改壳观感先改此件对照
