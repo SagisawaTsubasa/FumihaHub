@@ -8,6 +8,12 @@
     ?badmodule=1   -> lux stub module_url points to a missing file
                       (import-failure error card path)
     ?single=1      -> only one stub page in the directory
+    ?tall=1        -> lux slot loads tall-stub (30 cards, link-tokens path):
+                      scroll-ownership layout regression, FXH R1 #1
+    ?bare=1        -> lux slot loads bare-stub (no tokens link, own
+                      :host{display:block} — Stockroom/WHA shape, FXH R1 #1/#2)
+    ?inline=1      -> lux slot loads inline-stub (violates the display:block
+                      contract on purpose -> shell must console.warn, FXH R1 #2)
     ?none=1        -> empty directory (zero-page empty-state card path)
     runtime: window.__vanishLux() / window.__emptyDir() mutate the live directory
     ?rev=N         -> initial directory dir_rev (default 3)
@@ -38,6 +44,9 @@
   /* ---- fixtures -------------------------------------------------------- */
   var luxModule = params.has("badmodule")
     ? "/devstub/missing-stub.js?ver=0.0.0"  // genuinely 404s -> import failure path
+    : params.has("tall") ? "/devstub/tall-stub.js?ver=0.0.0"
+    : params.has("bare") ? "/devstub/bare-stub.js?ver=0.0.0"
+    : params.has("inline") ? "/devstub/inline-stub.js?ver=0.0.0"
     : "/devstub/lux-stub.js?ver=0.0.0";
   var anlModule = "/devstub/anl-stub.js?ver=0.0.0";
 
@@ -67,7 +76,10 @@
         order: 10,
         version: "0.0.0",
         module_url: luxModule,
-        element: "lux-stub-page",
+        element: params.has("tall") ? "tall-stub-page"
+               : params.has("bare") ? "bare-stub-page"
+               : params.has("inline") ? "inline-stub-page"
+               : "lux-stub-page",
       }]),
       ...(params.has("single") ? [] : [{
         id: "anl.main",

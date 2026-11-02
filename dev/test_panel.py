@@ -11,6 +11,10 @@ Starts the dev harness server in-process, then drives a real Chromium:
   6. ?failapi=1  -> connection lamp goes err
   7. ?badmodule=1 -> import failure renders an error card with a retry button
   8. screenshots: light/dark x desktop/narrow -> dev/shots/p0-*.png
+  9. scroll-ownership layout regression (FXH R1 #1/#2): tall / bare / inline
+     stubs — the mounted page element must be the sole vertical scroll
+     container, the shell .fx-content must never scroll, and a contract-
+     violating inline page must trigger the naming console.warn
 
 Usage: python dev/test_panel.py
 Exit code 0 = pass. Requires: playwright + chromium installed
@@ -22,6 +26,7 @@ from __future__ import annotations
 import importlib.util
 import sys
 import threading
+import time
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
@@ -405,6 +410,92 @@ def run_checks(browser, base: str) -> None:
     wait_shadow(page4, '[data-stub="lux"]', "pre-upgrade hass assignment still boots")
     page4.close()
 
+    # ---- 9: scroll-ownership layout regression (FXH R1 #1/#2) ---------------
+    # 满高嵌入契约的行为断言（R1 #1：此前 0 处布局断言，回退本批布局改动
+    # L2 仍全绿）。契约：挂载进来的页面元素是唯一纵向滚动容器（block +
+    # overflow-y:auto + 内部真实溢出），壳 .fx-content 永不滚动。
+    # tall = link tokens 路径；bare = 不 link tokens、自带 :host 契约
+    # （stockroom/WHA 形态，R1 #2 的 display:block 前提）；inline = 刻意
+    # 违反契约，壳的一次性探测必须 console.warn 指名元素（R1 #2 信号面）。
+    page5 = browser.new_page(viewport={"width": 1280, "height": 800})
+    page5.goto(base + "/?tall=1")
+    wait_shadow(page5, '[data-stub="tall"]', "tall stub mounts (link-tokens path)")
+    check_scroll_owner("tall desktop", scroll_probe(page5, "tall"))
+    tall_links = page5.evaluate(
+        """() => {
+          const h = document.getElementById('hub').shadowRoot.querySelector('.fx-page > *');
+          return h.shadowRoot.querySelectorAll('link[rel="stylesheet"]').length;
+        }"""
+    )
+    check("tall fixture links tokens (fixture integrity)", tall_links == 1, str(tall_links))
+
+    # 切 tab → 切回：inline 契约由每次 _mount 重新注入，重挂载后归属不变
+    page5.evaluate("() => { location.hash = 'pn=anl.main'; }")
+    wait_shadow(page5, '[data-stub="anl"]', "switched to anl tab")
+    page5.evaluate("() => { location.hash = 'pn=luxbalance.main'; }")
+    wait_shadow(page5, '[data-stub="tall"]', "switched back to tall tab")
+    check_scroll_owner("tall re-mount", scroll_probe(page5, "tall"))
+    page5.close()
+
+    # narrow viewport（内容区 ≈717px）：同一契约在更小的盒上成立
+    page6 = browser.new_page(viewport={"width": 390, "height": 800})
+    page6.goto(base + "/?tall=1&single=1")
+    wait_shadow(page6, '[data-stub="tall"]', "tall stub mounts in narrow viewport")
+    check_scroll_owner("tall narrow", scroll_probe(page6, "tall"))
+    page6.close()
+
+    # bare fixture：无 tokens link、自带 :host{display:block;height:100%}——
+    # inline 契约在「无 tokens」路径同样生效，且不得触发 display:inline 告警
+    bare_warns: list[str] = []
+    page7 = browser.new_page(viewport={"width": 1280, "height": 800})
+    page7.on(
+        "console",
+        lambda msg: bare_warns.append(msg.text) if msg.type == "warning" else None,
+    )
+    page7.goto(base + "/?bare=1&single=1")
+    wait_shadow(page7, '[data-stub="bare"]', "bare stub mounts (no-tokens path)")
+    check_scroll_owner("bare desktop", scroll_probe(page7, "bare"))
+    bare_links = page7.evaluate(
+        """() => {
+          const h = document.getElementById('hub').shadowRoot.querySelector('.fx-page > *');
+          return h.shadowRoot.querySelectorAll('link[rel="stylesheet"]').length;
+        }"""
+    )
+    check("bare fixture really skips tokens link (fixture integrity)", bare_links == 0, str(bare_links))
+    page7.wait_for_timeout(600)  # 留出 rAF 自检的帧
+    check(
+        "bare page does not trigger the display:inline warn",
+        not any("满高嵌入契约失效" in w for w in bare_warns),
+        "; ".join(bare_warns[:3]),
+    )
+    page7.close()
+
+    # inline fixture：违反 display:block 契约——壳必须告警且指名元素
+    inline_warns: list[str] = []
+    inline_errs: list[str] = []
+    page8 = browser.new_page(viewport={"width": 1280, "height": 800})
+    page8.on(
+        "console",
+        lambda msg: inline_warns.append(msg.text) if msg.type == "warning" else None,
+    )
+    page8.on("pageerror", lambda e: inline_errs.append(str(e)))
+    page8.goto(base + "/?inline=1&single=1")
+    wait_shadow(page8, '[data-stub="inline"]', "inline stub mounts (contract-violating)")
+    warned = False
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        if any("满高嵌入契约失效" in w and "inline-stub-page" in w for w in inline_warns):
+            warned = True
+            break
+        page8.wait_for_timeout(150)
+    check(
+        "inline page triggers the naming console.warn (R1 #2 signal face)",
+        warned,
+        "; ".join(inline_warns[:3]),
+    )
+    check("inline page boots without pageerror", not inline_errs, "; ".join(inline_errs[:3]))
+    page8.close()
+
     # ---- 8: screenshots (L3 base) ----------------------------------------------------
     shots = [
         ("/", "p0-light-desktop.png", 1280, 800),
@@ -443,6 +534,77 @@ def wait_shadow(page, selector: str, label: str, timeout_ms: int = 8000) -> None
         timeout=timeout_ms,
     )
     check(label, True)
+
+
+# ---- scroll-ownership helpers (FXH R1 #1) -----------------------------------
+
+SCROLL_METRICS_JS = """(stub) => {
+  const sr = document.getElementById('hub').shadowRoot;
+  if (!sr) return { settled: false };
+  const host = sr.querySelector('.fx-page > *');
+  const content = sr.querySelector('.fx-content');
+  const pageBox = sr.querySelector('.fx-page');
+  if (!host || !content || !pageBox || !host.shadowRoot ||
+      !host.shadowRoot.querySelector('[data-stub="' + stub + '"]')) {
+    return { settled: false };
+  }
+  const cs = getComputedStyle(host);
+  const m = {
+    hostName: host.tagName.toLowerCase(),
+    hostDisplay: cs.display,
+    hostOverflowY: cs.overflowY,
+    hostScroll: host.scrollHeight,
+    hostClient: host.clientHeight,
+    contentScroll: content.scrollHeight,
+    contentClient: content.clientHeight,
+    pageScroll: pageBox.scrollHeight,
+    pageClient: pageBox.clientHeight,
+  };
+  m.settled = m.hostDisplay === 'block' && m.hostOverflowY === 'auto'
+    && m.hostScroll > m.hostClient && m.contentScroll === m.contentClient;
+  return m;
+}"""
+
+
+def scroll_probe(page, stub: str, deadline_s: float = 8.0) -> dict:
+    """Poll the scroll-ownership metrics until the contract settles.
+
+    契约（FXH 滚动条批，R1 #1）：挂载进来的页面元素是唯一纵向滚动容器，
+    壳 .fx-content 永不滚动。轮询到全部谓词成立（tokens <link> 异步加载、
+    字体/布局就绪都自然被等掉）；失败时带最后一帧指标返回而非裸超时，
+    让 FAIL 自带诊断。回退壳侧布局改动会让 settled 永不成立。
+    """
+    deadline = time.monotonic() + deadline_s
+    metrics: dict = {}
+    while True:
+        metrics = page.evaluate(SCROLL_METRICS_JS, stub)
+        if metrics.get("settled"):
+            return metrics
+        if time.monotonic() >= deadline:
+            metrics["settled"] = False
+            return metrics
+        page.wait_for_timeout(150)
+
+
+def check_scroll_owner(prefix: str, m: dict) -> None:
+    """Assert each half of the scroll-ownership contract with detail."""
+    check(prefix + ": page element display block", m.get("hostDisplay") == "block", str(m))
+    check(prefix + ": page element overflowY auto", m.get("hostOverflowY") == "auto", str(m))
+    check(
+        prefix + ": page element overflows internally",
+        m.get("hostScroll", 0) > m.get("hostClient", 0),
+        str(m),
+    )
+    check(
+        prefix + ": shell .fx-content does not scroll",
+        m.get("contentScroll") == m.get("contentClient"),
+        str(m),
+    )
+    check(
+        prefix + ": shell .fx-page does not overflow",
+        m.get("pageScroll") == m.get("pageClient"),
+        str(m),
+    )
 
 
 if __name__ == "__main__":

@@ -60,6 +60,14 @@ window.FUMIHA.kit.defineOnce("<provider>-page",
   });
 ```
 
+**满高嵌入契约（v0.1.4 起）**：壳把页面元素按 `height:100%; overflow-y:auto`
+挂载——滚动条落页面元素自身，壳内容区零竖向滚动条。`height`/`overflow` 只对
+块级盒生效，因此页面元素必须计算为 `display: block`：link 壳 tokens.css 的
+页面由其 `:host{display:block}` 保证；**自带样式、不 link tokens.css 的页面
+必须自行声明 `:host{display:block;height:100%}`**，否则满高静默失效、滚动条
+退回壳层（壳每次挂载做一次性探测，元素仍为 `display:inline` 时 `console.warn`
+指名；详见 `custom_components/fumiha_hub/registry.py` 模块文档）。
+
 lux_balance 的 `web.py` 是按本契约实现的参考（双路径 + started 自愈 +
 模式重判）。
 

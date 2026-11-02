@@ -450,12 +450,57 @@ class FumihaHubPanel extends HTMLElement {
     // link tokens.css 的页面（stockroom/sensor_switch_controller 自带样式）
     // 同样生效，且优先级高于页面任何非 !important 样式，契约不被意外覆盖；
     // sticky 表头/fixed toast/top-layer dialog 行为均不受滚动容器变更影响。
+    // 前提（页面半边契约，FXH R1 #2）：页面元素必须是块级盒——height/overflow
+    // 对 inline 盒静默失效。link tokens.css 的页面由 tokens.css 的
+    // :host{display:block} 保证；自带样式的页面（stockroom/WHA 形态）须自行
+    // 声明 :host{display:block}（接入契约见 registry.py / README）。漏写时
+    // 无任何报错，_checkFullHeightContract 负责一次性探测并告警。
     // 独立模式（panel_custom 直挂、无壳）不经过此处，行为不变。
     pageEl.style.height = "100%";
     pageEl.style.overflowY = "auto";
     this._mountedElement = pageEl;
     this._mountedVersions.set(page.element, page.version);
     this._pageHost.replaceChildren(pageEl);
+    this._checkFullHeightContract(pageEl, page.element);
+  }
+
+  /* 满高契约自检（FXH R1 #2）：inline height/overflow 对 inline 盒静默失效——
+   * 页面漏写 :host{display:block} 时唯一症状是滚动条退回壳层，无异常无日志。
+   * 挂载后一帧做一次性探测，computed display 仍为 inline 就 console.warn 指名
+   * 元素。tokens.css 经 <link> 异步加载，就绪前 computed display 会短暂
+   * inline：探测时若 shadow 里还有未就绪的样式表 link（link.sheet 为空），
+   * 把判定推迟到其 load/error 之后复核，避免误报。一次性探测、无定时器；
+   * 监听挂在 link 节点上，随元素卸载一并废弃，无需清理；元素被换 mount/
+   * 面板断开时经 isConnected/_mountedElement 守卫静默退出。 */
+  _checkFullHeightContract(pageEl, elementName) {
+    requestAnimationFrame(() => {
+      if (!pageEl.isConnected || this._mountedElement !== pageEl) return;
+      const links = pageEl.shadowRoot
+        ? [...pageEl.shadowRoot.querySelectorAll('link[rel="stylesheet"]')]
+        : [];
+      const pending = links.filter((l) => !l.sheet);
+      const judge = () => {
+        if (!pageEl.isConnected || this._mountedElement !== pageEl) return;
+        if (getComputedStyle(pageEl).display === "inline") {
+          console.warn(
+            "[fumiha-hub] 满高嵌入契约失效：<" + elementName +
+            "> 计算样式仍为 display:inline，height:100%/overflow-y:auto 对 inline 盒不生效，" +
+            "滚动条会退回壳层。请在页面样式声明 :host{display:block}" +
+            "（页面接入契约，见 registry.py / README）。"
+          );
+        }
+      };
+      if (pending.length) {
+        let left = pending.length;
+        const done = () => { left -= 1; if (left === 0) judge(); };
+        for (const l of pending) {
+          l.addEventListener("load", done, { once: true });
+          l.addEventListener("error", done, { once: true });
+        }
+      } else {
+        judge();
+      }
+    });
   }
 
   _unmount() {

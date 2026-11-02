@@ -21,6 +21,21 @@ Descriptor (flat, JSON-safe):
     module_url  full static URL of the page module, e.g.
                 "/lux_balance/page.js?ver=0.2.0"
     element     custom element name defined by the module (must contain '-')
+
+Page element display contract (FXH R1 #2): the shell mounts the element with
+inline ``height:100%; overflow-y:auto`` — the page element is the vertical
+scroll container and the shell content area never scrolls. ``height`` and
+``overflow`` only apply to block-level boxes, so the mounted element MUST
+compute to ``display: block``:
+
+- pages linking the hub tokens.css get ``:host{display:block}`` from it;
+- pages with their own styles and no tokens link (Stockroom / WHA shape)
+  must declare ``:host{display:block}`` themselves.
+
+A page left ``display: inline`` fails silently (the scrollbar just returns
+to the shell, no exception, no log), so the shell audits every mount once
+and ``console.warn``s naming the element when the computed display is still
+inline.
 """
 
 from __future__ import annotations
