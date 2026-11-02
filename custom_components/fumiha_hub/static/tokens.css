@@ -235,6 +235,12 @@ body * {
 
 .fx-page {
   display: block;
+  /* 满高嵌入契约（壳侧半边，FXH 滚动条批 2026-11-03）：把内容区高度传给
+   * 挂载进来的页面元素——步骤 1 真机诊断实证高度链断在此处（.fx-page 无
+   * height → 页面元素 :host{height:100%} 退化为 auto → 外层滚动）。页面
+   * 元素自身的滚动由壳挂载时设的 inline overflow 承担（fumiha-hub.js
+   * _mount()），溢出兜底仍留给 .fx-content（加载卡/空态卡不超高，无条）。 */
+  height: 100%;
 }
 
 /* page wrapper inside pages: centered column like the two existing panels */

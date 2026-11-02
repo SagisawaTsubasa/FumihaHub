@@ -444,6 +444,15 @@ class FumihaHubPanel extends HTMLElement {
 
     const pageEl = document.createElement(page.element);
     pageEl.hass = this._hass;
+    // 满高嵌入契约（壳侧半边，步骤 1 真机诊断后落地）：壳 .fx-page 已定满高
+    // （tokens.css），页面元素在此统一设满高+纵向内滚——壳层 .fx-content 从此
+    // 零竖向滚动条，滚动条落子面板元素自身。用 inline 而非共享 class：对不
+    // link tokens.css 的页面（stockroom/sensor_switch_controller 自带样式）
+    // 同样生效，且优先级高于页面任何非 !important 样式，契约不被意外覆盖；
+    // sticky 表头/fixed toast/top-layer dialog 行为均不受滚动容器变更影响。
+    // 独立模式（panel_custom 直挂、无壳）不经过此处，行为不变。
+    pageEl.style.height = "100%";
+    pageEl.style.overflowY = "auto";
     this._mountedElement = pageEl;
     this._mountedVersions.set(page.element, page.version);
     this._pageHost.replaceChildren(pageEl);
