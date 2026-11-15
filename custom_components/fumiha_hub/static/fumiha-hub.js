@@ -85,7 +85,10 @@ class FumihaHubPanel extends HTMLElement {
     // button there is no way to reopen the sidebar on a phone.
     this._narrow = !!value;
     if (this._menuBtn) {
-      this._menuBtn.style.display = this._narrow ? "" : "none";
+      // F-604（FXH R1 首审）："" = 删除 inline 声明回落样式表 display:none，
+      // 菜单按钮 narrow 时永不显示（F-033 修复实际无效的既有缺陷）——显式
+      // 写 inline-flex 让 inline 声明压过样式表。
+      this._menuBtn.style.display = this._narrow ? "inline-flex" : "none";
     }
   }
 
@@ -193,7 +196,7 @@ class FumihaHubPanel extends HTMLElement {
         );
       },
     });
-    this._menuBtn.style.display = this._narrow ? "" : "none";
+    this._menuBtn.style.display = this._narrow ? "inline-flex" : "none";
     // A2（FXH 2026-11-15）：标签页设置入口——齿轮常驻顶栏（复用 .fx-menubtn
     // 类样式；narrow 显隐只由 JS 管辖菜单按钮的 inline display，齿轮不受
     // 影响）。existing .fx-menubtn 查询（narrow 测试）仍先命中菜单按钮。
@@ -207,6 +210,11 @@ class FumihaHubPanel extends HTMLElement {
         onclick: () => this._openTabSettings(),
       }
     );
+    // F-603（FXH R1 首审）：.fx-menubtn 样式表规则含 display:none——齿轮必须
+    // 显式给 inline display，否则计算样式恒 none 整体不可达（L2 程序化
+    // click() 会假绿，断言已改读 computed style）。不动 tokens.css（双仓
+    // 同步件，R4）：齿轮独占的显示值走 inline。
+    gearBtn.style.display = "inline-flex";
     const topbar = kit.el(
       "header",
       { class: "fx-topbar" },
@@ -426,6 +434,11 @@ class FumihaHubPanel extends HTMLElement {
         const next = rowEl.nextElementSibling;
         if (next) rowEl.parentNode.insertBefore(next, rowEl);
       }
+      // F-606（FXH R1 首审）：行首序号跟随实时 DOM 序，否则上移后编号
+      // 与保存顺序自相矛盾（save 按 listHost.children 取实时序）。
+      [...listHost.children].forEach((el, i) => {
+        el.firstElementChild.textContent = String(i + 1);
+      });
     };
     const btnStyle = { flex: "none", padding: "4px 9px" };
 
@@ -474,20 +487,30 @@ class FumihaHubPanel extends HTMLElement {
       // 顺序取自实时 DOM 序（rows 数组不追踪 move() 的 DOM 移动）：
       // 上移/下移后 listHost.children 即所见即所得的最终排布。
       const byRow = new Map(rows.map((r) => [r.row, r]));
-      [...listHost.children].forEach((rowEl, idx) => {
+      let seq = 0;
+      for (const rowEl of listHost.children) {
         const r = byRow.get(rowEl);
-        if (!r) return;
-        const entry = { order: idx + 1 };
+        if (!r) continue;
+        const entry = { order: ++seq };
         const title = r.input.value.trim();
-        if (title && title !== r.baseTitle) entry.title = title;
+        // F-608（FXH R1 首审）：空标题与 normalize_overrides 的 400 契约
+        // 对齐——静默回落默认会让用户以为保存成功（错误必须响）。
+        if (!title) {
+          kit.toast(dlg, "标题不能为空", { isError: true });
+          r.input.focus();
+          return;
+        }
+        if (title !== r.baseTitle) entry.title = title;
         overrides[r.id] = entry;
-      });
+      }
       saveBtn.disabled = true;
       try {
         await kit.api(this._hass).post(TAB_SETTINGS_URL, overrides);
       } catch (err) {
         saveBtn.disabled = false;
-        kit.toast(this.shadowRoot, "保存失败：" + (err && err.message ? err.message : err), { isError: true });
+        // F-607：弹窗在 top layer，toast 落壳根会被 ::backdrop 压暗甚至盖
+        // 住——挂 dlg 内保证可见。
+        kit.toast(dlg, "保存失败：" + (err && err.message ? err.message : err), { isError: true });
         return;
       }
       dlg.close();
@@ -505,7 +528,7 @@ class FumihaHubPanel extends HTMLElement {
       try {
         await kit.api(this._hass).post(TAB_SETTINGS_URL, {});
       } catch (err) {
-        kit.toast(this.shadowRoot, "恢复失败：" + (err && err.message ? err.message : err), { isError: true });
+        kit.toast(dlg, "恢复失败：" + (err && err.message ? err.message : err), { isError: true });  // F-607：top layer 内可见
         return;
       }
       dlg.close();

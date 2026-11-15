@@ -123,6 +123,20 @@ def run_checks(browser, base: str) -> None:
     # 齿轮常驻顶栏；设置弹窗每 tab 一行（标题输入+上移/下移+恢复默认标题）；
     # 全局保存发全量覆盖层（mock 捕获 POST+bump rev），弹窗关闭后轮询重渲
     # 染出新标题/新顺序；恢复全部默认=确认后 POST {} 清空覆盖层。
+    # F-603（R1 首审）：齿轮可见性必须断言 computed style——程序化 click()
+    # 对 display:none 的按钮照常派发事件，存在即点会假绿。
+    gear_vis = page.evaluate(
+        """() => {
+          const p = document.getElementById('hub');
+          const btn = p.shadowRoot.querySelector('button[aria-label="标签页设置"]');
+          if (!btn) return null;
+          return { display: getComputedStyle(btn).display,
+                   width: btn.getBoundingClientRect().width };
+        }"""
+    )
+    check("A2: gear button computed-visible (F-603)",
+          bool(gear_vis) and gear_vis["display"] != "none" and gear_vis["width"] > 0,
+          str(gear_vis))
     gear_ok = page.evaluate(
         """() => {
           const p = document.getElementById('hub');
@@ -147,6 +161,28 @@ def run_checks(browser, base: str) -> None:
         }"""
     )
     check("A2: dialog lists every tab as a row", rows == 2, str(rows))
+    # F-609（R1 首审）：每行「默认」按钮→基值连线钉（改第二行→点默认→回基值）
+    page.evaluate(
+        """() => {
+          const p = document.getElementById('hub');
+          const dlg = p.shadowRoot.querySelector('dialog.fx-tabprefs');
+          const rows2 = [...dlg.querySelectorAll('.fx-prefrow')];
+          const input = rows2[1].querySelector('input');
+          input.value = "临时名";
+          const resetBtn = [...rows2[1].querySelectorAll('button')]
+            .find((b) => (b.getAttribute('aria-label') || '').startsWith('恢复默认'));
+          resetBtn.click();
+        }"""
+    )
+    restored = page.evaluate(
+        """() => {
+          const p = document.getElementById('hub');
+          const dlg = p.shadowRoot.querySelector('dialog.fx-tabprefs');
+          return [...dlg.querySelectorAll('.fx-prefrow')][1].querySelector('input').value;
+        }"""
+    )
+    check("A2: per-row reset restores base title (F-609)",
+          restored == "夜灯助手", str(restored))
     page.evaluate(
         """() => {
           const p = document.getElementById('hub');
@@ -156,7 +192,22 @@ def run_checks(browser, base: str) -> None:
           const ups = [...dlg.querySelectorAll('.fx-prefrow button')]
             .filter((b) => (b.getAttribute('aria-label') || '').startsWith('上移'));
           ups[1].click();
-          dlg.querySelector('button.save-btn').click();
+        }"""
+    )
+    # F-606（R1 首审）：行首序号跟随实时 DOM 序（上移后编号不得倒序）
+    seq = page.evaluate(
+        """() => {
+          const p = document.getElementById('hub');
+          const dlg = p.shadowRoot.querySelector('dialog.fx-tabprefs');
+          return [...dlg.querySelectorAll('.fx-prefrow > span')].map((s) => s.textContent);
+        }"""
+    )
+    check("A2: row numbers follow DOM order after move (F-606)",
+          seq == ["1", "2"], str(seq))
+    page.evaluate(
+        """() => {
+          const p = document.getElementById('hub');
+          p.shadowRoot.querySelector('dialog.fx-tabprefs button.save-btn').click();
         }"""
     )
     page.wait_for_function(
@@ -225,6 +276,92 @@ def run_checks(browser, base: str) -> None:
         timeout=8000,
     )
     check("A2: reset-all restores base titles and order", True)
+
+    # F-608（R1 首审）：空标题保存拒绝——与 normalize_overrides 的 400 契约
+    # 对齐，弹窗保持打开且错误 toast 在弹窗内可见（top layer）。
+    page.evaluate(
+        """() => {
+          const p = document.getElementById('hub');
+          p.shadowRoot.querySelector('button[aria-label="标签页设置"]').click();
+        }"""
+    )
+    page.wait_for_function(
+        """() => {
+          const p = document.getElementById('hub');
+          return !!p.shadowRoot.querySelector('dialog.fx-tabprefs');
+        }""",
+        timeout=3000,
+    )
+    page.evaluate(
+        """() => {
+          const p = document.getElementById('hub');
+          const dlg = p.shadowRoot.querySelector('dialog.fx-tabprefs');
+          dlg.querySelectorAll('.fx-prefrow input')[0].value = "";
+          dlg.querySelector('button.save-btn').click();
+        }"""
+    )
+    page.wait_for_function(
+        """() => {
+          const p = document.getElementById('hub');
+          const dlg = p.shadowRoot.querySelector('dialog.fx-tabprefs');
+          const t = dlg.querySelector('.fx-toast');
+          return !!dlg.open && !!t && t.textContent.includes("标题不能为空");
+        }""",
+        timeout=3000,
+    )
+    check("A2: empty title rejected with toast inside dialog (F-608)", True)
+    page.evaluate(
+        """() => {
+          const p = document.getElementById('hub');
+          const dlg = p.shadowRoot.querySelector('dialog.fx-tabprefs');
+          const cancel = [...dlg.querySelectorAll('button')].find((b) => b.textContent === "取消");
+          cancel.click();
+        }"""
+    )
+
+    # F-607（R1 首审）：保存失败路径——__failSave → 500 → 弹窗仍开+错误
+    # toast 在弹窗内可见+保存按钮恢复可用；mock 永远 200 时此路径零回归。
+    page.evaluate("() => { window.__failSave = true; }")
+    page.evaluate(
+        """() => {
+          const p = document.getElementById('hub');
+          p.shadowRoot.querySelector('button[aria-label="标签页设置"]').click();
+        }"""
+    )
+    page.wait_for_function(
+        """() => {
+          const p = document.getElementById('hub');
+          return !!p.shadowRoot.querySelector('dialog.fx-tabprefs');
+        }""",
+        timeout=3000,
+    )
+    page.evaluate(
+        """() => {
+          const p = document.getElementById('hub');
+          const dlg = p.shadowRoot.querySelector('dialog.fx-tabprefs');
+          dlg.querySelectorAll('.fx-prefrow input')[0].value = "改名失败场景";
+          dlg.querySelector('button.save-btn').click();
+        }"""
+    )
+    page.wait_for_function(
+        """() => {
+          const p = document.getElementById('hub');
+          const dlg = p.shadowRoot.querySelector('dialog.fx-tabprefs');
+          const t = dlg.querySelector('.fx-toast');
+          return !!dlg.open && !!t && t.textContent.includes("保存失败");
+        }""",
+        timeout=3000,
+    )
+    page.evaluate("() => { window.__failSave = false; }")
+    check("A2: save failure keeps dialog open with visible toast (F-607)", True)
+    page.evaluate(
+        """() => {
+          const p = document.getElementById('hub');
+          const dlg = p.shadowRoot.querySelector('dialog.fx-tabprefs');
+          const cancel = [...dlg.querySelectorAll('button')].find((b) => b.textContent === "取消");
+          cancel.click();
+        }"""
+    )
 
     # ---- 3: deep link -------------------------------------------------------
     page.evaluate("location.hash = 'pn=anl.main'")
@@ -326,10 +463,12 @@ def run_checks(browser, base: str) -> None:
         """() => {
           const p = document.getElementById('hub');
           const b = p.shadowRoot.querySelector('.fx-menubtn');
-          return b ? {visible: b.style.display !== 'none'} : null;
+          if (!b) return null;
+          return { display: getComputedStyle(b).display, offset: b.offsetParent !== null };
         }"""
     )
-    check("narrow=true shows menu button", bool(btn and btn["visible"]), str(btn))
+    check("narrow=true shows menu button (computed, F-604)",
+          bool(btn) and btn["display"] != "none" and btn["offset"], str(btn))
     page.evaluate(
         """() => {
           const p = document.getElementById('hub');
@@ -353,10 +492,12 @@ def run_checks(browser, base: str) -> None:
         """() => {
           const p = document.getElementById('hub');
           const b = p.shadowRoot.querySelector('.fx-menubtn');
-          return b ? {visible: b.style.display !== 'none'} : null;
+          if (!b) return null;
+          return { display: getComputedStyle(b).display };
         }"""
     )
-    check("narrow=false hides menu button", bool(btn2 and not btn2["visible"]), str(btn2))
+    check("narrow=false hides menu button (computed, F-604)",
+          bool(btn2) and btn2["display"] == "none", str(btn2))
 
     # ---- reload window: vanished SELECTED page must not kick the user ----
     # (FXH-F-029/F-030: the vanished id must be the selected one, or the

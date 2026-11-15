@@ -187,22 +187,26 @@ ha_storage = _mod("homeassistant.helpers.storage")
 
 class _Store:
     """Minimal Store stand-in (真机实证 2026.1.3: Store(hass, version, key)
-    位置参数 + async_save(data) + async_load()) — 记录 save、重放最后 payload。"""
+    位置参数 + async_save(data) + async_load())。
+
+    F-610（FXH R1 首审）：storage 必须类级按 key 持久——生产代码每次操作都
+    新建 Store 实例，实例级 saved 会让 async_load 永远读不到上次 save（假
+    持久化桩，删掉 async_save 调用冒烟仍绿）。类级 dict 镜像真磁盘回读。"""
 
     instances: list = []
+    storage: dict = {}
 
     def __init__(self, hass, version, key, **kwargs):
         self.hass = hass
         self.version = version
         self.key = key
-        self.saved: list = []
         _Store.instances.append(self)
 
     async def async_load(self):
-        return self.saved[-1] if self.saved else None
+        return _Store.storage.get(self.key)
 
     async def async_save(self, data, **kwargs):
-        self.saved.append(data)
+        _Store.storage[self.key] = data
 
 
 ha_storage.Store = _Store
@@ -411,11 +415,20 @@ async def main_async() -> None:
     # remove 清键（FXH-F-029）
     await init_mod.async_setup_entry(hass, entry)
     assert registry_mod.REGISTRY_KEY in hass.data
+    # F-610：prefs 缓存随 remove 一并弹出（tab_prefs 状态配对的清理点）
+    prefs_mod.PREFS_CACHE_KEY and hass.data.__setitem__(
+        "custom_components.fumiha_hub.tab_prefs.PREFS_CACHE_KEY", {}
+    ) if False else hass.data.update({"fumiha_hub_tab_prefs": {"x": {}}})
     await init_mod.async_remove_entry(hass, entry)
     check(
         "remove deletes registry key (probe falls back)",
         registry_mod.REGISTRY_KEY not in hass.data,
         "probe must go false after hub removal",
+    )
+    check(
+        "remove_entry pops prefs cache (F-610)",
+        "fumiha_hub_tab_prefs" not in hass.data,
+        "prefs cache key survived removal",
     )
 
     # remove_entry 同时清了 hub 运行态——重新 setup 供后续各节使用
@@ -599,6 +612,15 @@ async def main_async() -> None:
         hass.data[prefs_mod.PREFS_CACHE_KEY]
         == {"anl.main": {"title": "夜灯", "order": 2}},
         str(hass.data.get(prefs_mod.PREFS_CACHE_KEY)),
+    )
+    # F-610：回读钉——清缓存后重读必须从 Store 拿回同一载荷（真磁盘持久
+    # 化语义；实例级桩下此钉必红）。
+    hass.data.pop(prefs_mod.PREFS_CACHE_KEY, None)
+    prefs2 = await prefs_mod.async_get_prefs(hass)
+    check(
+        "prefs persist across cache drop (Store roundtrip, F-610)",
+        prefs2 == {"anl.main": {"title": "夜灯", "order": 2}},
+        str(prefs2),
     )
     resp = await settings_view.post(FakeRequest(hass, {"ghost.main": {"order": 1}}))
     check("settings rejects orphan", resp.status == 400, str(resp.status))

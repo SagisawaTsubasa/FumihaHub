@@ -36,13 +36,53 @@ PREFS_CACHE_KEY = "fumiha_hub_tab_prefs"
 MAX_TITLE_LEN = 80
 
 
+def _sanitize_loaded(data: Any) -> dict[str, dict[str, Any]]:
+    """Structural validation for the on-disk overlay (FXH R1 首审 F-605).
+
+    与 base 无关——读取面不做 registry 归一化（消费者临时卸载期间的合法
+    死键不得删除，FXH-F-027）；只保证形状安全：条目仅接受 title/order 两
+    键且类型合法，其余键丢弃并 WARNING。坏 storage 不再能把目录轮询炸成
+    500（旧实现 {**panel, **ov} 整字典展开 + order 非int 时 sort TypeError）。
+    """
+    if not isinstance(data, dict):
+        if data is not None:
+            _LOGGER.warning(
+                "Tab prefs storage is not a dict (type=%s), ignored",
+                type(data).__name__,
+            )
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    for pid, entry in data.items():
+        if not isinstance(pid, str) or not isinstance(entry, dict):
+            _LOGGER.warning("Tab prefs entry %r malformed, dropped", pid)
+            continue
+        item: dict[str, Any] = {}
+        unknown = set(entry.keys()) - {"title", "order"}
+        if unknown:
+            _LOGGER.warning("Tab prefs %s drops unknown keys: %s", pid, sorted(unknown))
+        if "title" in entry:
+            title = entry["title"]
+            if isinstance(title, str) and title.strip() and len(title.strip()) <= MAX_TITLE_LEN:
+                item["title"] = title.strip()
+            else:
+                _LOGGER.warning("Tab prefs %s has invalid title, dropped", pid)
+        if "order" in entry:
+            order = entry["order"]
+            if isinstance(order, int) and not isinstance(order, bool):
+                item["order"] = order
+            else:
+                _LOGGER.warning("Tab prefs %s has invalid order, dropped", pid)
+        if item:
+            out[pid] = item
+    return out
+
+
 async def async_get_prefs(hass: HomeAssistant) -> dict[str, dict[str, Any]]:
     """Return the cached overlay, loading from Store on first access."""
     cached = hass.data.get(PREFS_CACHE_KEY)
     if cached is None:
         store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
-        data = await store.async_load()
-        cached = data if isinstance(data, dict) else {}
+        cached = _sanitize_loaded(await store.async_load())
         hass.data[PREFS_CACHE_KEY] = cached
         _LOGGER.debug("Tab prefs loaded: %d override(s)", len(cached))
     return cached
@@ -116,7 +156,13 @@ def apply_overrides(
     for panel in panels:
         ov = overrides.get(panel["id"])
         if ov:
-            panel = {**panel, **ov}
+            panel = dict(panel)
+            # F-605：白名单合并（仅 title/order）——覆盖层文件永不触碰
+            # module_url/element 等描述符字段（防旧 schema 写回污染）。
+            if "title" in ov:
+                panel["title"] = ov["title"]
+            if "order" in ov:
+                panel["order"] = ov["order"]
         out.append(panel)
     out.sort(key=lambda p: (p["order"], p["id"]))
     return out

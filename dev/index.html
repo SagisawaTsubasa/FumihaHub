@@ -151,6 +151,11 @@
         return new Response(JSON.stringify(directory()), { status: 200 });
       }
       if (path.startsWith("/api/fumiha_hub/tab_settings") && options && options.method === "POST") {
+        // F-607：失败路径开关（window.__failSave=true → 500），L2 断言
+        // 「弹窗仍开+错误 toast+保存按钮恢复可用」。
+        if (window.__failSave) {
+          return new Response(JSON.stringify({ error: "simulated save failure" }), { status: 500 });
+        }
         window.__lastTabSave = JSON.parse(options.body);
         tabOverrides = window.__lastTabSave;
         revBumps += 1;
