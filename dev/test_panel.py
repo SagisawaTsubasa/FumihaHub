@@ -104,6 +104,21 @@ def run_checks(browser, base: str) -> None:
     )
     check("first tab selected", tabs[0]["sel"] == "true", str(tabs))
 
+    # ---- A1 overscroll regression（FXH 用户反馈 2026-11-15）----------------
+    # 标签栏/壳体禁上下橡皮筋：.fx-tabs 显式 overflow-y:hidden+
+    # overscroll-behavior:none（竖拖不再把 tab 条当纵向滚动容器、滚动链在
+    # tab 条掐断）；.fx-shell 同设；挂载页面元素 inline contain（页面滚到
+    # 头不链到文档）。computed style 需 tokens link 加载完成，轮询等掉。
+    overscroll = poll_overscroll(page)
+    check("A1: .fx-tabs overflow-y hidden",
+          overscroll.get("tabsOverflowY") == "hidden", str(overscroll))
+    check("A1: .fx-tabs overscroll-behavior none",
+          overscroll.get("tabsOverscroll") == "none", str(overscroll))
+    check("A1: .fx-shell overscroll-behavior none",
+          overscroll.get("shellOverscroll") == "none", str(overscroll))
+    check("A1: page element overscroll contain",
+          overscroll.get("hostOverscroll") == "contain", str(overscroll))
+
     # ---- 3: deep link -------------------------------------------------------
     page.evaluate("location.hash = 'pn=anl.main'")
     wait_shadow(page, '[data-stub="anl"]', "deep link #pn=anl.main mounts anl page")
@@ -582,6 +597,43 @@ def scroll_probe(page, stub: str, deadline_s: float = 8.0) -> dict:
             return metrics
         if time.monotonic() >= deadline:
             metrics["settled"] = False
+            return metrics
+        page.wait_for_timeout(150)
+
+
+# ---- A1 overscroll helpers（FXH 2026-11-15）---------------------------------
+
+OVERSCROLL_JS = """() => {
+  const sr = document.getElementById('hub').shadowRoot;
+  if (!sr) return { ready: false };
+  const tabs = sr.querySelector('.fx-tabs');
+  const shell = sr.querySelector('.fx-shell');
+  const host = sr.querySelector('.fx-page > *');
+  if (!tabs || !shell) return { ready: false };
+  return {
+    ready: true,
+    tabsOverflowY: getComputedStyle(tabs).overflowY,
+    tabsOverscroll: getComputedStyle(tabs).overscrollBehavior,
+    shellOverscroll: getComputedStyle(shell).overscrollBehavior,
+    hostOverscroll: host ? getComputedStyle(host).overscrollBehavior : null,
+  };
+}"""
+
+
+def poll_overscroll(page, deadline_s: float = 8.0) -> dict:
+    """Poll computed overscroll styles until tokens.css has loaded and applied.
+
+    就绪判据=tab 条 overscroll 已生效为 none（tokens link 异步加载、布局
+    就绪都被等掉）；失败时带最后一帧指标返回，让 FAIL 自带诊断。回退
+    壳侧 overscroll 改动会让就绪判据永不成立而超时失败。
+    """
+    deadline = time.monotonic() + deadline_s
+    metrics: dict = {}
+    while True:
+        metrics = page.evaluate(OVERSCROLL_JS)
+        if metrics.get("ready") and metrics.get("tabsOverscroll") == "none":
+            return metrics
+        if time.monotonic() >= deadline:
             return metrics
         page.wait_for_timeout(150)
 

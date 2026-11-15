@@ -458,6 +458,10 @@ class FumihaHubPanel extends HTMLElement {
     // 独立模式（panel_custom 直挂、无壳）不经过此处，行为不变。
     pageEl.style.height = "100%";
     pageEl.style.overflowY = "auto";
+    // A1（FXH 2026-11-15）：页面滚到顶/头后触摸拖动的滚动链上抛，是长页
+    // 面在壳外触发 document 橡皮筋的另一来源——contain 收在页面元素自身
+    //（壳侧 .fx-shell/.fx-tabs 的 overscroll-behavior:none 管壳面）。
+    pageEl.style.overscrollBehavior = "contain";
     this._mountedElement = pageEl;
     this._mountedVersions.set(page.element, page.version);
     this._pageHost.replaceChildren(pageEl);
