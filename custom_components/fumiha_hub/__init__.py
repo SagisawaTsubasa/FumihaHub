@@ -14,6 +14,7 @@ from homeassistant.core import Event, HomeAssistant, callback
 
 from .const import DOMAIN
 from .registry import BUS_EVENT_PAGE_CHANGED, REGISTRY_KEY, get_registry
+from .tab_prefs import PREFS_CACHE_KEY
 from .web import async_setup_web, async_unload_web
 
 _LOGGER = logging.getLogger(__name__)
@@ -94,3 +95,4 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """
     hass.data.pop(DOMAIN, None)
     hass.data.pop(REGISTRY_KEY, None)
+    hass.data.pop(PREFS_CACHE_KEY, None)  # tab prefs cache (tab_prefs 状态配对)

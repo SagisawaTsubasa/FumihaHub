@@ -32,6 +32,12 @@ from .const import (
     URL_BASE,
 )
 from .registry import collect_panels
+from .tab_prefs import (
+    apply_overrides,
+    async_get_prefs,
+    async_save_prefs,
+    normalize_overrides,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -65,9 +71,57 @@ class DirectoryView(HomeAssistantView):
             else:
                 _WARNED_INVALID.add(signature)
                 _LOGGER.warning("Skipping invalid panel descriptor %s: %s", key, reason)
+        # A2 tab prefs (FXH 2026-11-15): defaults from the bare registry +
+        # the cached overlay applied on top; the overlay is a process-lifetime
+        # cache (tab_prefs) so the 5s poll never touches disk.
+        defaults = {p["id"]: {"title": p["title"], "order": p["order"]} for p in panels}
+        panels = apply_overrides(panels, await async_get_prefs(hass))
         state = hass.data.get(DOMAIN)
         return web.json_response(
-            {"dir_rev": state.dir_rev if state else 0, "panels": panels}
+            {
+                "dir_rev": state.dir_rev if state else 0,
+                "panels": panels,
+                "defaults": defaults,
+            }
+        )
+
+
+class TabSettingsView(HomeAssistantView):
+    """POST /api/fumiha_hub/tab_settings — persist the tab overlay.
+
+    Body = the full replacement overlay ``{page_id: {title?, order?}}``
+    (A2 决策 4: global save, no per-key wire format; 恢复默认 = send the
+    base values back and normalize_overrides drops them). Success bumps
+    dir_rev so every open shell re-renders its tab strip via the existing
+    5s poll gate (the shell also polls right after a save for instant
+    feedback).
+    """
+
+    url = f"{API_BASE}/tab_settings"
+    name = "api:fumiha_hub:tab_settings"
+    requires_auth = True
+
+    @require_admin
+    async def post(self, request: web.Request) -> web.Response:
+        hass = request.app["hass"]
+        try:
+            body = await request.json()
+        except ValueError:
+            return web.json_response({"error": "body must be JSON"}, status=400)
+        panels, _skipped = collect_panels(hass)
+        base = {p["id"]: {"title": p["title"], "order": p["order"]} for p in panels}
+        normalized, reason = normalize_overrides(body, base)
+        if normalized is None:
+            return web.json_response({"error": reason}, status=400)
+        await async_save_prefs(hass, normalized)
+        state = hass.data.get(DOMAIN)
+        if state is not None:
+            state.dir_rev += 1
+        return web.json_response(
+            {
+                "dir_rev": state.dir_rev if state else 0,
+                "overrides": normalized,
+            }
         )
 
 
@@ -77,6 +131,7 @@ async def async_setup_web(hass: HomeAssistant) -> None:
 
     if not flags.get("views"):
         hass.http.register_view(DirectoryView())
+        hass.http.register_view(TabSettingsView())
         flags["views"] = True
 
     if not flags.get("static"):

@@ -178,6 +178,35 @@ def _get_loaded_integration(hass, domain):
 
 ha_loader.async_get_loaded_integration = _get_loaded_integration
 
+# --- homeassistant.helpers.storage -------------------------------------------
+
+ha_helpers = _mod("homeassistant.helpers")
+ha_helpers.__path__ = []
+ha_storage = _mod("homeassistant.helpers.storage")
+
+
+class _Store:
+    """Minimal Store stand-in (真机实证 2026.1.3: Store(hass, version, key)
+    位置参数 + async_save(data) + async_load()) — 记录 save、重放最后 payload。"""
+
+    instances: list = []
+
+    def __init__(self, hass, version, key, **kwargs):
+        self.hass = hass
+        self.version = version
+        self.key = key
+        self.saved: list = []
+        _Store.instances.append(self)
+
+    async def async_load(self):
+        return self.saved[-1] if self.saved else None
+
+    async def async_save(self, data, **kwargs):
+        self.saved.append(data)
+
+
+ha_storage.Store = _Store
+
 # --- aiohttp.web stub (never depend on a real aiohttp being installed) ------
 
 aiohttp = _mod("aiohttp")
@@ -242,8 +271,15 @@ class FakeHass:
 
 
 class FakeRequest:
-    def __init__(self, hass):
+    def __init__(self, hass, payload=None, json_error=False):
         self.app = {"hass": hass}
+        self._payload = payload
+        self._json_error = json_error
+
+    async def json(self):
+        if self._json_error:
+            raise ValueError("bad json")
+        return self._payload
 
 
 # ---------------------------------------------------------------------------
@@ -258,6 +294,7 @@ async def main_async() -> None:
     registry_mod = importlib.import_module(PKG + ".registry")
     web_mod = importlib.import_module(PKG + ".web")  # kept: view-gate asserts below
     flow_mod = importlib.import_module(PKG + ".config_flow")
+    prefs_mod = importlib.import_module(PKG + ".tab_prefs")
     check("import chain", True)
 
     # 2. descriptor validation --------------------------------------------
@@ -302,7 +339,7 @@ async def main_async() -> None:
         registry_mod.REGISTRY_KEY in hass.data,
         "consumers probe by key existence",
     )
-    check("views registered", len(hass.http.views) == 1, f"got {len(hass.http.views)}")
+    check("views registered", len(hass.http.views) == 2, f"got {len(hass.http.views)}")
     check("static registered", len(hass.http.static) == 1, f"got {len(hass.http.static)}")
     check(
         "static path is URL_BASE",
@@ -343,7 +380,7 @@ async def main_async() -> None:
     await init_mod.async_setup_entry(hass, entry)
     check(
         "reload keeps single view registration",
-        len(hass.http.views) == 1,
+        len(hass.http.views) == 2,
         f"got {len(hass.http.views)}",
     )
     check(
@@ -459,6 +496,116 @@ async def main_async() -> None:
         )
     finally:
         logging.getLogger("custom_components.fumiha_hub.web").removeHandler(capture)
+
+    # 4b. tab prefs overlay (FXH 2026-11-15 A2) ------------------------------
+    # 缓存生命周期：§4 的目录视图轮询已触发首读装载（Store 已建、缓存已在
+    # hass.data）；save 同步重写缓存；目录视图在裸注册表之上套覆盖层并下发
+    # defaults；设置视图校验拒绝面齐全。
+    prefs = await prefs_mod.async_get_prefs(hass)
+    check("prefs cache empty on first read", prefs == {}, str(prefs))
+    check(
+        "prefs cache stored in hass.data",
+        prefs_mod.PREFS_CACHE_KEY in hass.data,
+        "cache key missing",
+    )
+    check(
+        "Store used for prefs",
+        any(s.key == prefs_mod.STORAGE_KEY for s in _Store.instances),
+        "no Store instance for tab prefs",
+    )
+
+    _base = {
+        "luxbalance.main": {"title": "亮度均衡", "order": 10},
+        "anl.main": {"title": "夜灯助手", "order": 5},
+    }
+    norm, reason = prefs_mod.normalize_overrides(
+        {"anl.main": {"title": "夜灯", "order": 2}}, _base
+    )
+    check(
+        "normalize keeps valid override",
+        norm == {"anl.main": {"title": "夜灯", "order": 2}},
+        f"{norm} {reason}",
+    )
+    norm, _ = prefs_mod.normalize_overrides({"ghost.main": {"order": 1}}, _base)
+    check("normalize rejects orphan page_id", norm is None, "orphan accepted")
+    norm, _ = prefs_mod.normalize_overrides({"anl.main": {"title": "  "}}, _base)
+    check("normalize rejects blank title", norm is None, "blank accepted")
+    norm, _ = prefs_mod.normalize_overrides({"anl.main": {"title": "x" * 81}}, _base)
+    check("normalize rejects overlong title", norm is None, "81 chars accepted")
+    norm, _ = prefs_mod.normalize_overrides({"anl.main": {"order": True}}, _base)
+    check("normalize rejects bool order", norm is None, "bool accepted")
+    norm, reason = prefs_mod.normalize_overrides(
+        {"anl.main": {"title": "夜灯助手", "order": 5}}, _base
+    )
+    check("base-equal values normalize away", norm == {}, f"{norm} {reason}")
+    norm, _ = prefs_mod.normalize_overrides(["nope"], _base)
+    check("normalize rejects non-dict payload", norm is None, "list accepted")
+
+    _panels = [
+        {"id": "luxbalance.main", "title": "亮度均衡", "order": 10},
+        {"id": "anl.main", "title": "夜灯助手", "order": 5},
+    ]
+    _out = prefs_mod.apply_overrides(
+        _panels,
+        {"anl.main": {"title": "夜灯", "order": 2}, "dead.main": {"order": 0}},
+    )
+    check(
+        "apply re-sorts and re-titles",
+        [p["id"] for p in _out] == ["anl.main", "luxbalance.main"]
+        and _out[0]["title"] == "夜灯",
+        str(_out),
+    )
+    check("apply leaves input untouched", _panels[0]["order"] == 10, str(_panels))
+    check("dead override key ignored", _out[0]["order"] == 2, str(_out))
+
+    # directory view: defaults exposed + overlay applied on top
+    hass.data[prefs_mod.PREFS_CACHE_KEY] = {"anl.main": {"title": "夜灯", "order": 2}}
+    resp = await view.get(FakeRequest(hass))
+    payload = json.loads(resp.json_dumps())
+    ids = [p["id"] for p in payload["panels"]]
+    check("directory applies overlay", ids == ["anl.main", "luxbalance.main"], str(ids))
+    check(
+        "directory exposes defaults",
+        payload["defaults"]["anl.main"] == {"title": "夜灯助手", "order": 5},
+        str(payload.get("defaults")),
+    )
+
+    # settings view: gate, accept, reject, bump
+    settings_view = hass.http.views[1]
+    check(
+        "settings view requires auth",
+        settings_view.requires_auth is True,
+        str(settings_view.requires_auth),
+    )
+    check(
+        "settings view guarded by require_admin",
+        getattr(settings_view.post, "_require_admin_applied", False) is True,
+        "require_admin marker missing on post()",
+    )
+    _rev_before = hass.data[const_mod.DOMAIN].dir_rev
+    resp = await settings_view.post(
+        FakeRequest(hass, {"anl.main": {"title": "夜灯", "order": 2}})
+    )
+    body = json.loads(resp.json_dumps())
+    check(
+        "settings save ok",
+        resp.status == 200
+        and body["overrides"] == {"anl.main": {"title": "夜灯", "order": 2}},
+        str(body),
+    )
+    check("settings save bumps dir_rev", body["dir_rev"] == _rev_before + 1, str(body))
+    check(
+        "settings save re-caches",
+        hass.data[prefs_mod.PREFS_CACHE_KEY]
+        == {"anl.main": {"title": "夜灯", "order": 2}},
+        str(hass.data.get(prefs_mod.PREFS_CACHE_KEY)),
+    )
+    resp = await settings_view.post(FakeRequest(hass, {"ghost.main": {"order": 1}}))
+    check("settings rejects orphan", resp.status == 400, str(resp.status))
+    resp = await settings_view.post(FakeRequest(hass, ["not", "a", "dict"]))
+    check("settings rejects non-dict body", resp.status == 400, str(resp.status))
+    resp = await settings_view.post(FakeRequest(hass, json_error=True))
+    check("settings rejects unparseable JSON", resp.status == 400, str(resp.status))
 
     # 5. config flow --------------------------------------------------------
     flow1 = flow_mod.FumihaHubConfigFlow()
