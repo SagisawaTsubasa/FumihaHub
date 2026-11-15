@@ -1,0 +1,1 @@
+{"reason": "FX-UX-126 步3：manifest 0.1.4→0.2.0（A1+A2 静态资源与 API 变更，?ver= 缓存戳全链生效）", "hunks": [{"old": "\"version\": \"0.1.4\"", "new": "\"version\": \"0.2.0\"", "hint_line": 5}]}

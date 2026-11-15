@@ -119,6 +119,113 @@ def run_checks(browser, base: str) -> None:
     check("A1: page element overscroll contain",
           overscroll.get("hostOverscroll") == "contain", str(overscroll))
 
+    # ---- A2 tab settings (FXH 2026-11-15) ----------------------------------
+    # 齿轮常驻顶栏；设置弹窗每 tab 一行（标题输入+上移/下移+恢复默认标题）；
+    # 全局保存发全量覆盖层（mock 捕获 POST+bump rev），弹窗关闭后轮询重渲
+    # 染出新标题/新顺序；恢复全部默认=确认后 POST {} 清空覆盖层。
+    gear_ok = page.evaluate(
+        """() => {
+          const p = document.getElementById('hub');
+          const btn = p.shadowRoot.querySelector('button[aria-label="标签页设置"]');
+          if (!btn) return false;
+          btn.click();
+          return true;
+        }"""
+    )
+    check("A2: gear button opens settings dialog", gear_ok is True)
+    page.wait_for_function(
+        """() => {
+          const p = document.getElementById('hub');
+          return !!p.shadowRoot.querySelector('dialog.fx-tabprefs');
+        }""",
+        timeout=3000,
+    )
+    rows = page.evaluate(
+        """() => {
+          const p = document.getElementById('hub');
+          return p.shadowRoot.querySelectorAll('dialog.fx-tabprefs .fx-prefrow').length;
+        }"""
+    )
+    check("A2: dialog lists every tab as a row", rows == 2, str(rows))
+    page.evaluate(
+        """() => {
+          const p = document.getElementById('hub');
+          const dlg = p.shadowRoot.querySelector('dialog.fx-tabprefs');
+          const inputs = [...dlg.querySelectorAll('.fx-prefrow input')];
+          inputs[1].value = "我的页面";
+          const ups = [...dlg.querySelectorAll('.fx-prefrow button')]
+            .filter((b) => (b.getAttribute('aria-label') || '').startsWith('上移'));
+          ups[1].click();
+          dlg.querySelector('button.save-btn').click();
+        }"""
+    )
+    page.wait_for_function(
+        """() => {
+          const p = document.getElementById('hub');
+          const tabs = [...p.shadowRoot.querySelectorAll('.fx-tab')].map((b) => b.textContent);
+          return tabs.length === 2 && tabs[0].includes("我的页面")
+            && !p.shadowRoot.querySelector('dialog.fx-tabprefs');
+        }""",
+        timeout=8000,
+    )
+    check("A2: save re-renders tabs renamed+reordered", True)
+    post_body = page.evaluate("() => window.__lastTabSave")
+    check(
+        "A2: POST payload = full dense overlay",
+        post_body == {"anl.main": {"order": 1, "title": "我的页面"},
+                      "luxbalance.main": {"order": 2}},
+        str(post_body),
+    )
+
+    # 恢复全部默认：确认对话框 → POST {} → 标题/顺序回基值
+    page.evaluate(
+        """() => {
+          const p = document.getElementById('hub');
+          p.shadowRoot.querySelector('button[aria-label="标签页设置"]').click();
+        }"""
+    )
+    page.wait_for_function(
+        """() => {
+          const p = document.getElementById('hub');
+          return !!p.shadowRoot.querySelector('dialog.fx-tabprefs');
+        }""",
+        timeout=3000,
+    )
+    page.evaluate(
+        """() => {
+          const p = document.getElementById('hub');
+          p.shadowRoot.querySelector('dialog.fx-tabprefs button.reset-all-btn').click();
+        }"""
+    )
+    page.wait_for_function(
+        """() => {
+          const p = document.getElementById('hub');
+          return [...p.shadowRoot.querySelectorAll('dialog.fx-dialog')]
+            .some((d) => !d.classList.contains('fx-tabprefs'));
+        }""",
+        timeout=3000,
+    )
+    page.evaluate(
+        """() => {
+          const p = document.getElementById('hub');
+          const confirm = [...p.shadowRoot.querySelectorAll('dialog.fx-dialog')]
+            .find((d) => !d.classList.contains('fx-tabprefs'));
+          const ok = [...confirm.querySelectorAll('button')].find((b) => b.textContent === '恢复');
+          ok.click();
+        }"""
+    )
+    page.wait_for_function(
+        """() => {
+          const p = document.getElementById('hub');
+          const tabs = [...p.shadowRoot.querySelectorAll('.fx-tab')].map((b) => b.textContent);
+          return tabs.length === 2 && tabs[0].includes("亮度均衡")
+            && tabs[1].includes("夜灯助手")
+            && !p.shadowRoot.querySelector('dialog.fx-tabprefs');
+        }""",
+        timeout=8000,
+    )
+    check("A2: reset-all restores base titles and order", True)
+
     # ---- 3: deep link -------------------------------------------------------
     page.evaluate("location.hash = 'pn=anl.main'")
     wait_shadow(page, '[data-stub="anl"]', "deep link #pn=anl.main mounts anl page")

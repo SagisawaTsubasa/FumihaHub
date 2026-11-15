@@ -21,6 +21,7 @@
 
 const STATIC_BASE = "/fumiha_hub";
 const DIRECTORY_URL = "/api/fumiha_hub/panels";
+const TAB_SETTINGS_URL = "/api/fumiha_hub/tab_settings";
 const POLL_MS = 5000;
 const HASH_RE = /pn=([A-Za-z0-9_.-]+)/;
 
@@ -193,12 +194,26 @@ class FumihaHubPanel extends HTMLElement {
       },
     });
     this._menuBtn.style.display = this._narrow ? "" : "none";
+    // A2（FXH 2026-11-15）：标签页设置入口——齿轮常驻顶栏（复用 .fx-menubtn
+    // 类样式；narrow 显隐只由 JS 管辖菜单按钮的 inline display，齿轮不受
+    // 影响）。existing .fx-menubtn 查询（narrow 测试）仍先命中菜单按钮。
+    const gearBtn = kit.el(
+      "button",
+      {
+        class: "fx-menubtn fx-gearbtn",
+        "aria-label": "标签页设置",
+        title: "标签页设置",
+        text: "⚙",
+        onclick: () => this._openTabSettings(),
+      }
+    );
     const topbar = kit.el(
       "header",
       { class: "fx-topbar" },
       this._menuBtn,
       kit.el("h1", { text: "文羽面板" }),
-      this._metaHost
+      this._metaHost,
+      gearBtn
     );
 
     this._tabHost = kit.el("nav", { class: "fx-tabs", role: "tablist", "aria-label": "页面" });
@@ -385,6 +400,140 @@ class FumihaHubPanel extends HTMLElement {
   }
 
   /* ---- page mounting ------------------------------------------------------ */
+
+  /* ---- A2 tab settings（FXH 2026-11-15）-----------------------------------
+   * 标签页设置弹窗（决策 4）：每行=标题输入框+上移/下移+恢复默认标题；
+   * 全局保存发全量覆盖层（服务端 normalize_overrides 把与基值相等的键归
+   * 零）；顺序=保存时的视觉序（稠密 1..N，所见即所得）；恢复全部默认=
+   * 确认后 POST {} 清空覆盖层。弹窗样式全内联——tokens.css 是 FumihaHub/
+   * FumihaLighting 双仓逐字同步件（R4），壳独占的弹窗样式不进共享件。 */
+  _openTabSettings() {
+    const kit = window.FUMIHA.kit;
+    const panels = this._dir && this._dir.panels;
+    if (!panels || !panels.length) {
+      kit.toast(this.shadowRoot, "目录未加载，暂无可设置项", { isError: true });
+      return;
+    }
+    const defaults = this._dir.defaults || {};
+    const dlg = document.createElement("dialog");
+    dlg.className = "fx-dialog fx-tabprefs";
+
+    const move = (rowEl, dir) => {
+      if (dir < 0) {
+        const prev = rowEl.previousElementSibling;
+        if (prev) rowEl.parentNode.insertBefore(rowEl, prev);
+      } else {
+        const next = rowEl.nextElementSibling;
+        if (next) rowEl.parentNode.insertBefore(next, rowEl);
+      }
+    };
+    const btnStyle = { flex: "none", padding: "4px 9px" };
+
+    const rows = panels.map((p, idx) => {
+      const baseTitle = (defaults[p.id] && defaults[p.id].title) || p.title;
+      const input = kit.el("input", {
+        type: "text",
+        value: p.title,
+        maxlength: "80",
+        "aria-label": "标题 " + p.title,
+        style: {
+          flex: "1", minWidth: "0", padding: "4px 8px",
+          border: "1px solid var(--fx-edge)", borderRadius: "6px",
+          background: "var(--fx-panel)", color: "inherit", font: "inherit",
+          fontSize: "13px",
+        },
+      });
+      const row = kit.el(
+        "div",
+        { class: "fx-prefrow", style: { display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" } },
+        kit.el("span", {
+          style: { flex: "none", minWidth: "20px", textAlign: "right",
+                   color: "var(--secondary-text-color, #888)", fontSize: "12px" },
+        }, String(idx + 1)),
+        input,
+        kit.el("button", { class: "cx-btn", style: btnStyle, title: "上移",
+                           "aria-label": "上移 " + p.title, onclick: () => move(row, -1) }, "↑"),
+        kit.el("button", { class: "cx-btn", style: btnStyle, title: "下移",
+                           "aria-label": "下移 " + p.title, onclick: () => move(row, 1) }, "↓"),
+        kit.el("button", { class: "cx-btn", style: btnStyle, title: "恢复默认标题",
+                           "aria-label": "恢复默认 " + p.title,
+                           onclick: () => { input.value = baseTitle; } }, "默认"),
+      );
+      return { id: p.id, input, baseTitle, row };
+    });
+
+    const listHost = kit.el("div", { style: { margin: "10px 0" } });
+    rows.forEach((r) => listHost.appendChild(r.row));
+
+    const saveBtn = kit.el("button", { class: "cx-btn primary save-btn", onclick: () => save() }, "保存");
+    const resetAllBtn = kit.el("button", { class: "cx-btn reset-all-btn", onclick: () => resetAll() }, "恢复全部默认");
+    const cancelBtn = kit.el("button", { class: "cx-btn", onclick: () => dlg.close() }, "取消");
+
+    const save = async () => {
+      const overrides = {};
+      // 顺序取自实时 DOM 序（rows 数组不追踪 move() 的 DOM 移动）：
+      // 上移/下移后 listHost.children 即所见即所得的最终排布。
+      const byRow = new Map(rows.map((r) => [r.row, r]));
+      [...listHost.children].forEach((rowEl, idx) => {
+        const r = byRow.get(rowEl);
+        if (!r) return;
+        const entry = { order: idx + 1 };
+        const title = r.input.value.trim();
+        if (title && title !== r.baseTitle) entry.title = title;
+        overrides[r.id] = entry;
+      });
+      saveBtn.disabled = true;
+      try {
+        await kit.api(this._hass).post(TAB_SETTINGS_URL, overrides);
+      } catch (err) {
+        saveBtn.disabled = false;
+        kit.toast(this.shadowRoot, "保存失败：" + (err && err.message ? err.message : err), { isError: true });
+        return;
+      }
+      dlg.close();
+      kit.toast(this.shadowRoot, "标签设置已保存 ✓");
+      this._poll();
+    };
+
+    const resetAll = async () => {
+      const ok = await kit.confirmDialog(this.shadowRoot, {
+        title: "恢复全部默认",
+        text: "清除全部自定义标题与排序，回到各集成注册的默认值？",
+        confirmLabel: "恢复",
+      });
+      if (!ok) return;
+      try {
+        await kit.api(this._hass).post(TAB_SETTINGS_URL, {});
+      } catch (err) {
+        kit.toast(this.shadowRoot, "恢复失败：" + (err && err.message ? err.message : err), { isError: true });
+        return;
+      }
+      dlg.close();
+      kit.toast(this.shadowRoot, "已恢复默认 ✓");
+      this._poll();
+    };
+
+    dlg.append(
+      kit.el("div", { style: { fontWeight: "600", marginBottom: "4px" } }, "标签页设置"),
+      kit.el("div", {
+        style: { fontSize: "12px", color: "var(--secondary-text-color, #888)", marginBottom: "6px" },
+      }, "顺序按下方排布从上到下保存；保存后立即生效。"),
+      listHost,
+      kit.el("div", { style: { display: "flex", gap: "8px", justifyContent: "flex-end", alignItems: "center" } },
+        resetAllBtn, cancelBtn, saveBtn)
+    );
+    dlg.addEventListener("close", () => dlg.remove());
+    dlg.addEventListener("cancel", (e) => { e.preventDefault(); dlg.close(); });
+    this.shadowRoot.appendChild(dlg);
+    if (typeof dlg.showModal === "function") {
+      dlg.showModal();
+    } else {
+      dlg.remove();
+      kit.toast(this.shadowRoot, "浏览器不支持对话框", { isError: true });
+      return;
+    }
+    if (rows.length) rows[0].input.focus();
+  }
 
   async _mount() {
     const kit = window.FUMIHA.kit;
